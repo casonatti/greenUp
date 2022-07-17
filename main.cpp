@@ -3,7 +3,7 @@
 #include <string.h>
 using namespace std;
 
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 32
 #define MAX_MACHINES 10
 
 typedef struct __managerDB {
@@ -47,8 +47,10 @@ void signalHandler(int signum) { //CTRL+C handler
     exit(signum);
 }
 
+
 int main(int argc, char** argv) {
     int n_machines = 0; //number of machines connected
+    managerDB manDb[MAX_MACHINES]; //structure hold by manager
     signal(SIGINT, signalHandler); //CTRL+C
     signal(SIGHUP, signalHandler); //terminal closed while process still running
 
