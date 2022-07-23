@@ -1,10 +1,19 @@
 #include <csignal>
 #include <iostream>
 #include <string.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
+
 using namespace std;
 
-#define BUFFER_SIZE 32
+#define BUFFER_SIZE 256
 #define MAX_MACHINES 10
+#define PORT 4000
 
 typedef struct __managerDB {
     const char* hostname;
@@ -50,28 +59,103 @@ void signalHandler(int signum) { //CTRL+C handler
 
 int main(int argc, char** argv) {
     int n_machines = 0; //number of machines connected
+    int sockfd, ret_value;
+    unsigned int length;
+    char buffer[BUFFER_SIZE];
+    struct sockaddr_in serv_addr;
     managerDB manDb[MAX_MACHINES]; //structure hold by manager
     signal(SIGINT, signalHandler); //CTRL+C
     signal(SIGHUP, signalHandler); //terminal closed while process still running
 
 //---------------------------------------------------------- PARTICIPANT section ----------------------------------------------------------
     if(argc == 1) {
-        // while(true) {
+        struct sockaddr_in from;
+        struct hostent *server;
+        server = gethostbyname("localhost");
+        if(server == NULL) {
+            cout << "No such host!" << endl;
+            exit(0);
+        }
 
-        // }
+        if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+            cout << "Socket creation error." << endl;
+            exit(0);
+        }
+
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_port = htons(PORT);
+        serv_addr.sin_addr = *((struct in_addr *)server->h_addr);
+        bzero(&(serv_addr.sin_zero), 8);
+
+        cout << "Enter the message: ";
+        bzero(buffer, BUFFER_SIZE);
+        cin >> buffer;
+
+        ret_value = sendto(sockfd, buffer, strlen(buffer), 0, (const struct sockaddr *) &serv_addr, sizeof(struct sockaddr_in));
+        if(ret_value < 0) {
+            cout << "Sendto error.";
+            exit(0);
+        }
+
+        length = sizeof(struct sockaddr_in);
+
+        ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &from, &length);
+        if(ret_value < 0) {
+            cout << "Recvfrom error.";
+            exit(0);
+        }
+
+        cout << "Server response: " << buffer;
+
+        close(sockfd);
+        return 0;
     }
 
 //------------------------------------------------------------ MANAGER section ------------------------------------------------------------
     //argv[1] does exist.
-    if(argc == 2) { 
+    if(argc == 2) {
+        socklen_t cli_len;
+        struct sockaddr_in cli_addr;
         if(strcmp(argv[1], "manager") != 0) { //argv[1] != "manager"
             cout << "argv NOT OK" << endl;
             return -1;
         }
 
-        // while(true) {
+        if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+            cout << "Socket creation error";
+            exit(0);
+        }
 
-        // }
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_port = htons(PORT);
+        serv_addr.sin_addr.s_addr = INADDR_ANY;
+        bzero(&(serv_addr.sin_zero), 8);
+
+        if(bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr)) < 0) {
+            cout << "Bind error.";
+            exit(0);
+        }
+
+        cli_len = sizeof(struct sockaddr_in);
+
+        while(true) {
+            ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &cli_addr, &cli_len);
+            if(ret_value < 0) {
+                cout << "Recvfrom error.";
+                exit(0);
+            }
+
+            cout << "Received dgram: " << buffer << endl;
+
+            ret_value = sendto(sockfd, "Got your message\n", 17, 0, (struct sockaddr *) &cli_addr, sizeof(struct sockaddr));
+            if(ret_value < 0) {
+                cout << "Sendto error.";
+                exit(0);
+            }
+
+            close(sockfd);
+            return 0;
+        }
     }
 
     return 0;
