@@ -15,7 +15,6 @@ using namespace std;
 #define BUFFER_SIZE 32
 #define MAX_MACHINES 10
 #define PORT_SERVER 8000
-#define PORT_PARTICIPANT 4000
 
 #define SLEEP_SERVICE_DISCOVERY "sleep service discovery"
 #define SLEEP_STATUS_REQUEST    "sleep status request"
@@ -77,7 +76,7 @@ int main(int argc, char** argv) {
     if(argc == 1) {
         struct sockaddr_in from;
         struct hostent *server;
-        //server = gethostbyname("localhost");
+        server = gethostbyname("localhost");
         if(server == NULL) {
             cout << "No such host!" << endl;
             exit(0);
@@ -90,7 +89,7 @@ int main(int argc, char** argv) {
 
         serv_addr.sin_family = AF_INET;
         serv_addr.sin_port = htons(PORT_SERVER);
-        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        serv_addr.sin_addr = *((struct in_addr *) server->h_addr);
         //bzero(&(serv_addr.sin_zero), 8);
 
         ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, (char*)&so_broadcast, sizeof(so_broadcast));
@@ -100,9 +99,18 @@ int main(int argc, char** argv) {
         }
 
         //TODO talvez esse while possa ser uma thread separada...
-        while(true) {   
+        while(true) {
+            cout << "Message: ";
             memset(buffer, '\0', BUFFER_SIZE);
-            ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &from, &length);
+            cin.getline(buffer, BUFFER_SIZE);
+            
+            ret_value = sendto(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr_in));
+            if(ret_value < 0) {
+                cout << "Recvfrom error." << endl; //TODO tratar esse erro
+            }
+
+            memset(buffer, '\0', BUFFER_SIZE);
+            ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &serv_addr, &length);
             if(ret_value < 0) {
                 cout << "Recvfrom error." << endl; //TODO tratar esse erro
             }
@@ -157,6 +165,15 @@ int main(int argc, char** argv) {
         cli_len = sizeof(struct sockaddr_in);
 
         while(true) {
+            memset(buffer, '\0', BUFFER_SIZE);
+            ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &cli_addr, &cli_len);
+            if(ret_value < 0) {
+                cout << "Recvfrom error.";
+                exit(0);
+            }
+
+            cout << "Received dgram: " << buffer << endl;
+
             //TODO enviar sleep service discovery em broadcast
             ret_value = sendto(sockfd, SLEEP_SERVICE_DISCOVERY, strlen(SLEEP_SERVICE_DISCOVERY), 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr));
             if(ret_value < 0) {
