@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -11,9 +12,13 @@
 
 using namespace std;
 
-#define BUFFER_SIZE 256
+#define BUFFER_SIZE 32
 #define MAX_MACHINES 10
-#define PORT 4000
+#define PORT_SERVER 8000
+#define PORT_PARTICIPANT 4000
+
+#define SLEEP_SERVICE_DISCOVERY "sleep service discovery"
+#define SLEEP_STATUS_REQUEST    "sleep status request"
 
 typedef struct __managerDB {
     const char* hostname;
@@ -60,8 +65,9 @@ void signalHandler(int signum) { //CTRL+C handler
 int main(int argc, char** argv) {
     int n_machines = 0; //number of machines connected
     int sockfd, ret_value;
+    int so_broadcast = true;
     unsigned int length;
-    char buffer[BUFFER_SIZE];
+    char buffer[BUFFER_SIZE] = {0};
     struct sockaddr_in serv_addr;
     managerDB manDb[MAX_MACHINES]; //structure hold by manager
     signal(SIGINT, signalHandler); //CTRL+C
@@ -71,7 +77,7 @@ int main(int argc, char** argv) {
     if(argc == 1) {
         struct sockaddr_in from;
         struct hostent *server;
-        server = gethostbyname("localhost");
+        //server = gethostbyname("localhost");
         if(server == NULL) {
             cout << "No such host!" << endl;
             exit(0);
@@ -83,29 +89,34 @@ int main(int argc, char** argv) {
         }
 
         serv_addr.sin_family = AF_INET;
-        serv_addr.sin_port = htons(PORT);
-        serv_addr.sin_addr = *((struct in_addr *)server->h_addr);
-        bzero(&(serv_addr.sin_zero), 8);
+        serv_addr.sin_port = htons(PORT_SERVER);
+        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        //bzero(&(serv_addr.sin_zero), 8);
 
-        cout << "Enter the message: ";
-        bzero(buffer, BUFFER_SIZE);
-        cin >> buffer;
-
-        ret_value = sendto(sockfd, buffer, strlen(buffer), 0, (const struct sockaddr *) &serv_addr, sizeof(struct sockaddr_in));
-        if(ret_value < 0) {
-            cout << "Sendto error.";
+        ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, (char*)&so_broadcast, sizeof(so_broadcast));
+        if(ret_value) {
+            cout << "Setsockopt error.";
             exit(0);
         }
 
-        length = sizeof(struct sockaddr_in);
+        //TODO talvez esse while possa ser uma thread separada...
+        while(true) {   
+            memset(buffer, '\0', BUFFER_SIZE);
+            ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &from, &length);
+            if(ret_value < 0) {
+                cout << "Recvfrom error." << endl; //TODO tratar esse erro
+            }
 
-        ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &from, &length);
-        if(ret_value < 0) {
-            cout << "Recvfrom error.";
-            exit(0);
+            if(strcmp(buffer, SLEEP_SERVICE_DISCOVERY) == 0) {
+                cout << "Entrei aqui (SLEEP_SERVICE_DISCOVERY)!" << endl;
+                //criar thread Discovery Subservice
+            }
+
+            if(strcmp(buffer, SLEEP_STATUS_REQUEST) == 0) {
+                cout << "Entrei aqui (SLEEP_STATUS_REQUEST)!" << endl;
+                //criar thread Monitorin Subservice
+            }
         }
-
-        cout << "Server response: " << buffer;
 
         close(sockfd);
         return 0;
@@ -116,6 +127,7 @@ int main(int argc, char** argv) {
     if(argc == 2) {
         socklen_t cli_len;
         struct sockaddr_in cli_addr;
+
         if(strcmp(argv[1], "manager") != 0) { //argv[1] != "manager"
             cout << "argv NOT OK" << endl;
             return -1;
@@ -127,9 +139,15 @@ int main(int argc, char** argv) {
         }
 
         serv_addr.sin_family = AF_INET;
-        serv_addr.sin_port = htons(PORT);
-        serv_addr.sin_addr.s_addr = INADDR_ANY;
-        bzero(&(serv_addr.sin_zero), 8);
+        serv_addr.sin_port = htons(PORT_SERVER);
+        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        //bzero(&(serv_addr.sin_zero), 8);
+
+        ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &so_broadcast, sizeof(so_broadcast));
+        if(ret_value) {
+            cout << "Setsockopt error.";
+            exit(0);
+        }
 
         if(bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr)) < 0) {
             cout << "Bind error.";
@@ -139,6 +157,14 @@ int main(int argc, char** argv) {
         cli_len = sizeof(struct sockaddr_in);
 
         while(true) {
+            //TODO enviar sleep service discovery em broadcast
+            ret_value = sendto(sockfd, SLEEP_SERVICE_DISCOVERY, strlen(SLEEP_SERVICE_DISCOVERY), 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr));
+            if(ret_value < 0) {
+                cout << "Sendto error. AQUI??";
+                exit(0);
+            }
+
+            memset(buffer, '\0', BUFFER_SIZE);
             ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &cli_addr, &cli_len);
             if(ret_value < 0) {
                 cout << "Recvfrom error.";
@@ -147,15 +173,15 @@ int main(int argc, char** argv) {
 
             cout << "Received dgram: " << buffer << endl;
 
-            ret_value = sendto(sockfd, "Got your message\n", 17, 0, (struct sockaddr *) &cli_addr, sizeof(struct sockaddr));
+            memset(buffer, '\0', BUFFER_SIZE);
+            ret_value = sendto(sockfd, SLEEP_SERVICE_DISCOVERY, strlen(SLEEP_SERVICE_DISCOVERY), 0, (struct sockaddr *) &cli_addr, sizeof(struct sockaddr));
             if(ret_value < 0) {
                 cout << "Sendto error.";
                 exit(0);
             }
-
-            close(sockfd);
-            return 0;
         }
+
+        close(sockfd);
     }
 
     return 0;
