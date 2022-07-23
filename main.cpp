@@ -100,16 +100,16 @@ int main(int argc, char** argv) {
 
         //TODO talvez esse while possa ser uma thread separada...
         while(true) {
-            cout << "Message: ";
-            memset(buffer, '\0', BUFFER_SIZE);
-            cin.getline(buffer, BUFFER_SIZE);
+            // cout << "Message: ";
+            // memset(buffer, '\0', BUFFER_SIZE);
+            // cin.getline(buffer, BUFFER_SIZE);
             
-            ret_value = sendto(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr_in));
-            if(ret_value < 0) {
-                cout << "Recvfrom error." << endl; //TODO tratar esse erro
-            }
+            // ret_value = sendto(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr_in));
+            // if(ret_value < 0) {
+            //     cout << "Recvfrom error." << endl; //TODO tratar esse erro
+            // }
 
-            memset(buffer, '\0', BUFFER_SIZE);
+            // memset(buffer, '\0', BUFFER_SIZE);
             ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &serv_addr, &length);
             if(ret_value < 0) {
                 cout << "Recvfrom error." << endl; //TODO tratar esse erro
@@ -165,26 +165,26 @@ int main(int argc, char** argv) {
         cli_len = sizeof(struct sockaddr_in);
 
         while(true) {
-            memset(buffer, '\0', BUFFER_SIZE);
-            ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &cli_addr, &cli_len);
-            if(ret_value < 0) {
-                cout << "Recvfrom error.";
-                exit(0);
-            }
+            // memset(buffer, '\0', BUFFER_SIZE);
+            // ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &cli_addr, &cli_len);
+            // if(ret_value < 0) {
+            //     cout << "Recvfrom error.";
+            //     exit(0);
+            // }
 
-            cout << "Received dgram: " << buffer << endl;
+            // cout << "Received dgram: " << buffer << endl;
 
             //TODO enviar sleep service discovery em broadcast
             ret_value = sendto(sockfd, SLEEP_SERVICE_DISCOVERY, strlen(SLEEP_SERVICE_DISCOVERY), 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr));
             if(ret_value < 0) {
-                cout << "Sendto error. AQUI??";
+                cout << "Sendto error. AQUI??" << endl;;
                 exit(0);
             }
 
             memset(buffer, '\0', BUFFER_SIZE);
             ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &cli_addr, &cli_len);
             if(ret_value < 0) {
-                cout << "Recvfrom error.";
+                cout << "Recvfrom error." << endl;
                 exit(0);
             }
 
@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
             memset(buffer, '\0', BUFFER_SIZE);
             ret_value = sendto(sockfd, SLEEP_SERVICE_DISCOVERY, strlen(SLEEP_SERVICE_DISCOVERY), 0, (struct sockaddr *) &cli_addr, sizeof(struct sockaddr));
             if(ret_value < 0) {
-                cout << "Sendto error.";
+                cout << "Sendto error." << endl;
                 exit(0);
             }
         }
