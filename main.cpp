@@ -38,7 +38,7 @@ typedef struct __packet {
 //---------------------------------------------------------- GLOBAL VAR section ----------------------------------------------------------
 int teste = 1;
 
-void signalHandler(int signum) { //CTRL+C handler
+void signalHandler(int signum) {
     const char* exit_command = "EXIT";
     const char* exit_message = "sleep service exit";
     char buffer[BUFFER_SIZE] = { 0 };
@@ -71,30 +71,35 @@ static void * thr_participant_function(void* arg) {
     struct sockaddr_in recv_addr;
     struct sockaddr_in sockaddr;
     
+    //creates the socket
     if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
             cout << "Socket creation error." << endl;
             exit(0);
     }
 
+    //Set socket broadcast option to true
     ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag, sizeof true_flag);
     if(ret_value < 0) {
         cout << "Setsockopt [SO_BROADCAST] error." << endl;
         exit(0);
     }
 
+    //participant receiving address configuration
     socklen_t recv_addr_len = sizeof(recv_addr);
     memset(&recv_addr, 0, sizeof recv_addr);
     recv_addr.sin_family = AF_INET;
     recv_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
-    recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  //important for broadcast listening
 
+    //bind the participant's listening port
     ret_value = bind(sockfd, (struct sockaddr*) &recv_addr, sizeof(recv_addr));
     if(ret_value < 0) {
         cout << "nao funfa!" << endl;
         exit(0);
     }    
     
-    while(true) {      
+    while(true) {
+        //wait for manager's message
         memset(buffer, '\0', BUFFER_SIZE);
         ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&recv_addr, &recv_addr_len);
         if(ret_value < 0) {
@@ -102,16 +107,18 @@ static void * thr_participant_function(void* arg) {
             exit(0);
         }
 
+        //TODO debug (apagar depois)
         cout << "RECEBI: " << buffer << endl;
 
+        //compare manager's message and work on it based on the right option
         if(strcmp(buffer, SLEEP_SERVICE_DISCOVERY) == 0) {
             cout << "Entrei aqui (SLEEP_SERVICE_DISCOVERY)!" << endl;
-            //TODO criar thread Discovery Subservice
+            //TODO criar thread Discovery Subservice (?)
         }
 
         if(strcmp(buffer, SLEEP_STATUS_REQUEST) == 0) {
             cout << "Entrei aqui (SLEEP_STATUS_REQUEST)!" << endl;
-            //TODO criar thread Monitorin Subservice
+            //TODO criar thread Monitorin Subservice (?)
         }
     }
 
@@ -149,21 +156,22 @@ int main(int argc, char** argv) {
         int n_machines = 0; //number of machines connected
         int sockfd;
         int true_flag = true;
-        unsigned int length;
         char buffer[BUFFER_SIZE] = {0};
         struct sockaddr_in send_addr, recv_addr;
-        managerDB manDb[MAX_MACHINES]; //structure hold by manager
+        managerDB manDb[MAX_MACHINES]; //structure hold by manager (should be global!)
 
         if(strcmp(argv[1], "manager") != 0) { //argv[1] != "manager"
             cout << "argv NOT OK" << endl;
             return -1;
         }
 
+        //creates manager socket
         if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
             cout << "Socket creation error";
             exit(0);
         }
 
+        //set socket options broadcast and reuseaddr to true
         ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag, sizeof true_flag);
         if(ret_value < 0) {
             cout << "Setsockopt [SO_BROADCAST] error." << endl;
@@ -176,6 +184,7 @@ int main(int argc, char** argv) {
             exit(0);
         }
 
+        //configure manager's sending and receiving addresses
         memset(&send_addr, 0, sizeof send_addr);
         send_addr.sin_family = AF_INET;
         send_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
@@ -193,7 +202,7 @@ int main(int argc, char** argv) {
         //     exit(0);
         // }
 
-        //TODO debug (apagar)
+        //TODO debug (apagar depois)
         int i = 0;
 
         while(true) {
