@@ -231,7 +231,7 @@ int main(int argc, char** argv) {
 
         while(true) {
             memset(buffer, '\0', BUFFER_SIZE);
-            
+            inet_aton("127.255.255.255", &send_addr.sin_addr);
             //sending in broadcast
             ret_value = sendto(sockfd, SLEEP_SERVICE_DISCOVERY, strlen(SLEEP_SERVICE_DISCOVERY), 0, (struct sockaddr *) &send_addr, sizeof send_addr);
             if(ret_value < 0) {
