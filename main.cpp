@@ -97,7 +97,7 @@ static void * thr_participant_function(void* arg) {
     recv_addr.sin_family = AF_INET;
     recv_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
     // recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  //important for broadcast listening
-    inet_aton("127.255.255.255", &recv_addr.sin_addr);
+    inet_aton("127.255.255.255", &recv_addr.sin_addr); //broadcast address for UNIX
 
     //participant sending address configuration
     // memset(&serv_addr, 0, sizeof serv_addr);
@@ -108,17 +108,13 @@ static void * thr_participant_function(void* arg) {
     // bind the participant's listening port
     ret_value = bind(sockfd, (struct sockaddr*) &recv_addr, sizeof(recv_addr));
     if(ret_value < 0) {
-        cout << "nao funfa!" << endl;
+        cout << "Bind socket error." << endl;
         exit(0);
     }    
-
-    // strcpy(buffer, "resposta participante!");
-    // cout << "Enviando mensagem: " << buffer << endl; 
-    // sendto(sockfd, buffer, strlen(buffer), 0, (const struct sockaddr*) &serv_addr, sizeof(struct sockaddr_in));
     
     while(true) {
         //wait for manager's message
-        cout << "To aguardando msg..." << endl;
+        cout << "\nTo aguardando msg..." << endl; //TODO debug (apagar depois)
         memset(buffer, '\0', BUFFER_SIZE);
         ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&recv_addr, &recv_addr_len);
         if(ret_value < 0) {
@@ -127,7 +123,7 @@ static void * thr_participant_function(void* arg) {
         }
 
         //TODO debug (apagar depois)
-        cout << "Buffer: " << buffer << " len: " << strlen(buffer) << endl;
+        cout << "Buffer: " << buffer << endl;
 
         //compare manager's message and work on it based on the right option
         if(strcmp(buffer, SLEEP_SERVICE_DISCOVERY) == 0) {
@@ -144,13 +140,14 @@ static void * thr_participant_function(void* arg) {
     }
 
     close(sockfd);
-    // return 0;
+    return 0;
 }
 
 
 //---------------------------------------------------------- MAIN CODE section ----------------------------------------------------------
 int main(int argc, char** argv) {
     int ret_value;
+    //TODO signal for CTRL+D
     signal(SIGINT, signalHandler); //CTRL+C
     signal(SIGHUP, signalHandler); //terminal closed while process still running
 
@@ -179,7 +176,7 @@ int main(int argc, char** argv) {
         int true_flag = true;
         char buffer[BUFFER_SIZE] = {0};
         struct sockaddr_in send_addr, recv_addr;
-        managerDB manDb[MAX_MACHINES]; //structure hold by manager (should be global!)
+        managerDB manDb[MAX_MACHINES]; //structure hold by manager
 
         if(strcmp(argv[1], "manager") != 0) { //argv[1] != "manager"
             cout << "argv NOT OK" << endl;
@@ -219,7 +216,7 @@ int main(int argc, char** argv) {
         //TODO Descomentar essa parte pro Manager poder "ouvir" as respostas!
         ret_value = bind(sockfd, (struct sockaddr *) &recv_addr, sizeof recv_addr);
         if(ret_value < 0) {
-            cout << "Bind error." << endl;
+            cout << "Bind socket error." << endl;
             exit(0);
         }
 
