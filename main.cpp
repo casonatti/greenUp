@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <cstdlib> //exit() precisa desse include nos labs do inf
 
 using namespace std;
 
