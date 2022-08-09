@@ -72,7 +72,7 @@ static void * thr_participant_function(void* arg) {
     struct sockaddr_in recv_addr, serv_addr, from;
     struct hostent *server;
     
-    server = gethostbyname("localhost"); //TODO modificar
+    server = gethostbyname("192.168.0.185"); //TODO modificar
 
     //creates the socket
     if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -106,7 +106,8 @@ static void * thr_participant_function(void* arg) {
     memset(&serv_addr, 0, sizeof recv_addr);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = (in_port_t) htons(PORT_MANAGER_LISTENING);
-    serv_addr.sin_addr = *((struct in_addr *) server->h_addr);
+    //serv_addr.sin_addr = *((struct in_addr *) server->h_addr);
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     // bind the participant's listening port
     ret_value = bind(sockfd, (struct sockaddr*) &recv_addr, sizeof(recv_addr));
@@ -215,7 +216,8 @@ int main(int argc, char** argv) {
         memset(&broadcast_addr, 0, sizeof broadcast_addr);
         broadcast_addr.sin_family = AF_INET;
         broadcast_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
-        inet_aton("127.255.255.255", &broadcast_addr.sin_addr);
+        //inet_aton("127.255.255.255", &broadcast_addr.sin_addr);
+        inet_aton("192.168.0.255", &broadcast_addr.sin_addr); //minha rede local
 
         ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, sizeof manager_addr);
         if(ret_value < 0) {
