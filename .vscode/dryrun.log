@@ -1,7 +1,0 @@
-make --dry-run --always-make --keep-going --print-directory
-make: Entering directory '/home/jeison/sisop/greenUp'
-g++ -c main.cpp
-g++ -o sleep_server main.o -lpthread
-rm -rf *.o
-make: Leaving directory '/home/jeison/sisop/greenUp'
- 
