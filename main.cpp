@@ -37,7 +37,6 @@ typedef struct __packet {
 } packet;
 
 //---------------------------------------------------------- GLOBAL VAR section ----------------------------------------------------------
-int teste = 1;
 
 void signalHandler(int signum) {
     const char* exit_command = "EXIT";
@@ -66,11 +65,38 @@ void signalHandler(int signum) {
 }
 
 static void * thr_participant_function(void* arg) {
-    int sockfd, ret_value;
+    int sockfd, ret_value, i;
     int true_flag = true;
     char buffer[BUFFER_SIZE] = {0};
+    char my_hostname[32];
+    char my_mac_addr[16];
+    char* my_ip_addr;
+    const char* status;
     struct sockaddr_in recv_addr, serv_addr, from;
-    struct hostent *server;
+    struct hostent *server, *participant;
+
+    cout << "========= Configurando o Participante =========" << endl;
+
+    cout << "Getting my hostname..." << endl;
+    gethostname(my_hostname, sizeof(my_hostname));
+    cout << "My hostname = " << my_hostname << endl << endl;
+
+    cout << "Getting my MAC address..." << endl;
+    FILE *file = fopen("/sys/class/net/wlo1/address", "r"); //TODO mudar wlo1 -> eth0 (ou o nome certo do diretorio)
+    i = 0;
+    while(fscanf(file, "%c", &my_mac_addr[i]) == 1)
+        i++;
+    cout << "My MAC address = " << my_mac_addr << endl << endl;
+
+    cout << "Getting my IP address..." << endl;
+    participant = gethostbyname(my_hostname);
+    my_ip_addr = inet_ntoa(*((struct in_addr*) participant->h_addr_list[0]));
+    cout << "My IP address = " << my_ip_addr << endl << endl;
+
+    status = "awaken";
+    cout << "Status = " << status << endl;
+
+    cout << "===============================================" << endl << endl;
     
     server = gethostbyname("192.168.0.185"); //TODO modificar
 
@@ -118,7 +144,7 @@ static void * thr_participant_function(void* arg) {
     
     while(true) {
         //wait for manager's message
-        cout << "\nTo aguardando msg..." << endl; //TODO debug (apagar depois)
+        cout << "To aguardando msg..." << endl; //TODO debug (apagar depois)
         memset(buffer, '\0', BUFFER_SIZE);
         ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&from, &serv_addr_len);
         if(ret_value < 0) {
@@ -133,13 +159,16 @@ static void * thr_participant_function(void* arg) {
         if(strcmp(buffer, SLEEP_SERVICE_DISCOVERY) == 0) {
             //TODO criar thread Discovery Subservice (?)
             strcpy(buffer, "resposta participante!");
-            cout << "Enviando mensagem: " << buffer << endl;
+            cout << "Enviando mensagem: " << buffer << endl; //TODO apagar depois
             sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
         }
 
         if(strcmp(buffer, SLEEP_STATUS_REQUEST) == 0) {
             cout << "Entrei aqui (SLEEP_STATUS_REQUEST)!" << endl;
             //TODO criar thread Monitorin Subservice (?)
+            strcpy(buffer, status);
+            cout << "Enviando status: " << endl; //TODO apagar depois
+            sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
         }
     }
 
@@ -226,7 +255,7 @@ int main(int argc, char** argv) {
         }
 
         //TODO debug (apagar depois)
-        int i = 0;
+        int n = 0;
 
         //TODO teste...
         participant_len = sizeof(struct sockaddr_in);
@@ -240,8 +269,8 @@ int main(int argc, char** argv) {
                 exit(0);
             }
 
-            i++;
-            cout << "Enviei (x" << i << ")" << endl;
+            n++;
+            cout << "Enviei (x" << n << ")" << endl;
 
             memset(buffer, '\0', BUFFER_SIZE);
             // ret_value = recv(sockfd, buffer, sizeof(buffer)-1, 0);
