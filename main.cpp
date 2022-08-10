@@ -106,7 +106,7 @@ static void * thr_participant_function(void* arg) {
     memset(&serv_addr, 0, sizeof recv_addr);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = (in_port_t) htons(PORT_MANAGER_LISTENING);
-    //serv_addr.sin_addr = *((struct in_addr *)2. server->h_addr);
+    //serv_addr.sin_addr = *((struct in_addr *)server->h_addr);
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     // bind the participant's listening port
@@ -233,7 +233,6 @@ int main(int argc, char** argv) {
 
         while(true) {
             memset(buffer, '\0', BUFFER_SIZE);
-            //inet_aton("127.255.255.255", &broadcast_addr.sin_addr);
             //sending in broadcast
             ret_value = sendto(sockfd, SLEEP_SERVICE_DISCOVERY, strlen(SLEEP_SERVICE_DISCOVERY), 0, (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
             if(ret_value < 0) {
