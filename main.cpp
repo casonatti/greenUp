@@ -87,6 +87,7 @@ static void * thr_participant_function(void* arg) {
     while(fscanf(file, "%c", &my_mac_addr[i]) == 1)
         i++;
     cout << "My MAC address = " << my_mac_addr << endl << endl;
+    fclose(file);
 
     cout << "Getting my IP address..." << endl;
     participant = gethostbyname(my_hostname);
