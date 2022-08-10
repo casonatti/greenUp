@@ -1,5 +1,6 @@
 #include <csignal>
 #include <iostream>
+#include <ifaddrs.h>
 #include <string.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -72,8 +73,9 @@ static void * thr_participant_function(void* arg) {
     char my_mac_addr[16];
     char* my_ip_addr;
     const char* status;
-    struct sockaddr_in recv_addr, serv_addr, from;
+    struct sockaddr_in recv_addr, serv_addr, from, *teste;
     struct hostent *server, *participant;
+    struct ifaddrs *ifap, *ifa;
 
     cout << "========= Configurando o Participante =========" << endl;
 
@@ -90,8 +92,17 @@ static void * thr_participant_function(void* arg) {
     fclose(file);
 
     cout << "Getting my IP address..." << endl;
-    participant = gethostbyname(my_hostname);
-    my_ip_addr = inet_ntoa(*((struct in_addr*) participant->h_addr_list[0]));
+    //participant = gethostbyname(my_hostname);
+    //my_ip_addr = inet_ntoa(*((struct in_addr*) participant->h_addr_list[0]));
+    getifaddrs(&ifap);
+    for(ifa = ifap; ifa; ifa = ifa->ifa_next) {
+        if(ifa->ifa_addr && ifa->ifa_addr->sa_family==AF_INET) {
+            if(strcmp(ifa->ifa_name, "wlo1") == 0) { //TODO trocar wlo1 -> eth0
+                teste = (struct sockaddr_in *) ifa->ifa_addr;
+                my_ip_addr = inet_ntoa(teste->sin_addr);
+            }
+        }
+    }
     cout << "My IP address = " << my_ip_addr << endl << endl;
 
     status = "awaken";
@@ -127,14 +138,15 @@ static void * thr_participant_function(void* arg) {
     memset(&recv_addr, 0, sizeof recv_addr);
     recv_addr.sin_family = AF_INET;
     recv_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
-    recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  //important for broadcast listening
+    //recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  //important for broadcast listening
+    recv_addr.sin_addr.s_addr = inet_addr("192.168.0.185");
 
     //manager address configuration
-    memset(&serv_addr, 0, sizeof recv_addr);
+    memset(&serv_addr, 0, sizeof serv_addr);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = (in_port_t) htons(PORT_MANAGER_LISTENING);
     //serv_addr.sin_addr = *((struct in_addr *)server->h_addr);
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr.sin_addr.s_addr = inet_addr("192.168.0.185");
 
     // bind the participant's listening port
     ret_value = bind(sockfd, (struct sockaddr*) &recv_addr, sizeof(recv_addr));
