@@ -22,20 +22,20 @@ using namespace std;
 #define SLEEP_SERVICE_DISCOVERY "sleep service discovery"
 #define SLEEP_STATUS_REQUEST    "sleep status request"
 
-typedef struct __managerDB {
+struct managerDB {
     const char* hostname;
     const char* MAC;
     const char* IP;
     const char* status;
-} managerDB;
+};
 
-typedef struct __packet {
+struct packet {
     uint16_t type;          //DATA | CMD
     uint16_t seqn;          //sequence number
     uint16_t length;        //payload length
     uint16_t timestamp;     //packet timestamp
-    const char* payload;    //packet data
-} packet;
+    char payload[BUFFER_SIZE];    //packet data
+};
 
 //---------------------------------------------------------- GLOBAL VAR section ----------------------------------------------------------
 
@@ -66,7 +66,7 @@ void signalHandler(int signum) {
 }
 
 static void * thr_participant_function(void* arg) {
-    int sockfd, ret_value, i;
+    int sockfd, ret_value, i, seqn = 1;
     int true_flag = true;
     char buffer[BUFFER_SIZE] = {0};
     char my_hostname[32];
@@ -76,6 +76,7 @@ static void * thr_participant_function(void* arg) {
     struct sockaddr_in recv_addr, serv_addr, from, *teste;
     struct hostent *server, *participant;
     struct ifaddrs *ifap, *ifa;
+    struct packet pack;
 
     cout << "========= Configurando o Participante =========" << endl;
 
@@ -110,7 +111,7 @@ static void * thr_participant_function(void* arg) {
 
     cout << "===============================================" << endl << endl;
     
-    server = gethostbyname("192.168.0.185"); //TODO modificar
+    server = gethostbyname("localhost"); //TODO modificar
 
     //creates the socket
     if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -138,15 +139,15 @@ static void * thr_participant_function(void* arg) {
     memset(&recv_addr, 0, sizeof recv_addr);
     recv_addr.sin_family = AF_INET;
     recv_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
-    //recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  //important for broadcast listening
-    recv_addr.sin_addr.s_addr = inet_addr("192.168.0.185");
+    recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  //important for broadcast listening
+    //recv_addr.sin_addr.s_addr = inet_addr("192.168.0.10");
 
     //manager address configuration
     memset(&serv_addr, 0, sizeof serv_addr);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = (in_port_t) htons(PORT_MANAGER_LISTENING);
-    //serv_addr.sin_addr = *((struct in_addr *)server->h_addr);
-    serv_addr.sin_addr.s_addr = inet_addr("192.168.0.185");
+    serv_addr.sin_addr = *((struct in_addr *)server->h_addr);
+    //serv_addr.sin_addr.s_addr = inet_addr("192.168.0.10");
 
     // bind the participant's listening port
     ret_value = bind(sockfd, (struct sockaddr*) &recv_addr, sizeof(recv_addr));
@@ -171,9 +172,16 @@ static void * thr_participant_function(void* arg) {
         //compare manager's message and work on it based on the right option
         if(strcmp(buffer, SLEEP_SERVICE_DISCOVERY) == 0) {
             //TODO criar thread Discovery Subservice (?)
-            strcpy(buffer, "resposta participante!");
-            cout << "Enviando mensagem: " << buffer << endl; //TODO apagar depois
-            sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
+            pack.type = 1; //TODO modificar
+            pack.seqn = seqn;
+            //pack.payload = "Teste!";
+            strcpy(pack.payload, "Teste!");
+            pack.length = strlen(pack.payload);
+            seqn++;
+
+            //strcpy(buffer, "resposta participante!");
+            //cout << "Enviando mensagem: " << buffer << endl; //TODO apagar depois
+            sendto(sockfd, (struct __packet *)&pack, (1024 + sizeof(pack)), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
         }
 
         if(strcmp(buffer, SLEEP_STATUS_REQUEST) == 0) {
@@ -224,6 +232,7 @@ int main(int argc, char** argv) {
         socklen_t participant_len;
         struct sockaddr_in manager_addr, broadcast_addr, participant_addr;
         managerDB manDb[MAX_MACHINES]; //structure hold by manager
+        packet * pack = (struct packet *) malloc(sizeof(struct packet));
 
         if(strcmp(argv[1], "manager") != 0) { //argv[1] != "manager"
             cout << "argv NOT OK" << endl;
@@ -254,12 +263,14 @@ int main(int argc, char** argv) {
         manager_addr.sin_family = AF_INET;
         manager_addr.sin_port = (in_port_t) htons(PORT_MANAGER_LISTENING);
         manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        //manager_addr.sin_addr.s_addr = inet_addr("192.168.0.10");
+
 
         memset(&broadcast_addr, 0, sizeof broadcast_addr);
         broadcast_addr.sin_family = AF_INET;
         broadcast_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
-        //inet_aton("127.255.255.255", &broadcast_addr.sin_addr);
-        inet_aton("255.255.255.255", &broadcast_addr.sin_addr); //broadcast da minha rede local
+        inet_aton("127.255.255.255", &broadcast_addr.sin_addr);
+        //inet_aton("192.168.0.255", &broadcast_addr.sin_addr); //broadcast da minha rede local
 
         ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, sizeof manager_addr);
         if(ret_value < 0) {
@@ -287,13 +298,16 @@ int main(int argc, char** argv) {
 
             memset(buffer, '\0', BUFFER_SIZE);
             // ret_value = recv(sockfd, buffer, sizeof(buffer)-1, 0);
-            ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &participant_addr, &participant_len);
+            ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0, (struct sockaddr *) &participant_addr, &participant_len);
             if(ret_value < 0) {
                 cout << "Recvfrom error.";
                 exit(0);
             }
 
-            cout << "Received dgram: " << buffer << endl;
+            cout << "Received dgram type: " << pack->type << endl;
+            cout << "Received dgram seqn: " << pack->seqn << endl;
+            cout << "Received dgram payload: " << pack->payload << endl;
+            cout << "Received dgram length: " << pack->length << endl << endl;
 
             sleep(3);
         }
