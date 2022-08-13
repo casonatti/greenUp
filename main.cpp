@@ -15,7 +15,8 @@
 using namespace std;
 
 // ------------------------------------------------ GLOBAL VAR section -------------------------------------------------
-#include "globals.cpp"
+//#include "globals.cpp"
+#include "participantsTable.cpp"
 // ---------------------------------------------------------------------------------------------------------------------
 
 void signalHandler(int signum) {
@@ -60,7 +61,7 @@ static void *thr_participant_function(void *arg) {
     cout << "My hostname = " << my_hostname << endl << endl;
 
     cout << "Getting my MAC address..." << endl;
-    FILE *file = fopen("/sys/class/net/enp0s3/address",
+    FILE *file = fopen("/sys/class/net/wlo1/address",
                        "r");  // TODO: colocar o nome da interface de rede (ou o nome certo do diretorio)
     i = 0;
     while (fscanf(file, "%c", &my_mac_addr[i]) == 1)
@@ -75,7 +76,7 @@ static void *thr_participant_function(void *arg) {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
@@ -166,6 +167,8 @@ static void *thr_participant_function(void *arg) {
 
 // ------------------------------------------------ MAIN CODE section --------------------------------------------------
 int main(int argc, char **argv) {
+    participantsTable p;
+    p.printTable();
     ssize_t ret_value;
     // TODO: signal for CTRL+D
     signal(SIGINT, signalHandler); // CTRL+C
@@ -197,7 +200,7 @@ int main(int argc, char **argv) {
         char buffer[BUFFER_SIZE] = {0};
         socklen_t participant_len;
         struct sockaddr_in manager_addr{}, broadcast_addr{}, participant_addr{};
-        managerDB manDb[MAX_MACHINES]; // structure hold by manager
+        participant manDb[MAX_MACHINES]; // structure hold by manager
         auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
         if (strcmp(argv[1], "manager") != 0) { // argv[1] != "manager"
