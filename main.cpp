@@ -10,53 +10,28 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
-#include <cstdlib> //exit() precisa desse include nos labs do inf
+#include <cstdlib> // exit() precisa desse include nos labs do inf
 
 using namespace std;
 
-#define BUFFER_SIZE 32
-#define MAX_MACHINES 10
-#define PORT_MANAGER_LISTENING 8000
-#define PORT_PARTICIPANT_LISTENING 4000
-#define TYPE_EXIT 3
-
-#define SLEEP_SERVICE_DISCOVERY "sleep service discovery"
-#define SLEEP_STATUS_REQUEST    "sleep status request"
-
-struct managerDB {
-    const char *hostname;
-    const char *MAC;
-    const char *IP;
-    const char *status;
-};
-
-struct packet {
-    uint16_t type;          //DATA | CMD
-    uint16_t seqn;          //sequence number
-    uint16_t length;        //payload length
-    uint16_t timestamp;     //packet timestamp
-    char payload[BUFFER_SIZE];    //packet data
-};
-
-//---------------------------------------------------------- GLOBAL VAR section ----------------------------------------------------------
-int sockfd, ret_value, seqn = 1;
-struct sockaddr_in recv_addr, serv_addr;
-struct packet *pack = (struct packet *) malloc(sizeof(packet));
+// ------------------------------------------------ GLOBAL VAR section -------------------------------------------------
+#include "globals.cpp"
+// ---------------------------------------------------------------------------------------------------------------------
 
 void signalHandler(int signum) {
-    pack->type = TYPE_EXIT;
-    pack->seqn = seqn;
-    strcpy(pack->payload, "EXIT");
-    pack->length = strlen(pack->payload);
-    
-    sendto(sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
-        
+    g_pack->type = TYPE_EXIT;
+    g_pack->seqn = g_seqn;
+    strcpy(g_pack->payload, "EXIT");
+    g_pack->length = strlen(g_pack->payload);
+
+    sendto(g_sockfd, g_pack, (1024 + sizeof(*g_pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
+
     //recv(sock, buffer, BUFFER_SIZE, 0);
     //cout << "received message from server: \"" << buffer << "\"" << endl << endl;
 
     //cout << "sending message to server: \"" << exit_message << "\"" << endl;
     //send(sock, exit_message, strlen(exit_message), 0);
-        
+
     //recv(sock, buffer, BUFFER_SIZE, 0);
     //cout << "received message from server: \"" << buffer << "\"" << endl << endl;
 
@@ -72,7 +47,7 @@ static void *thr_participant_function(void *arg) {
     char my_mac_addr[16];
     char *my_ip_addr;
     const char *status;
-    struct sockaddr_in from, *teste;
+    struct sockaddr_in from{}, *teste;
     struct hostent *server, *participant;
     struct ifaddrs *ifap, *ifa;
     auto *pack = (struct packet *) malloc(sizeof(packet));
@@ -84,7 +59,8 @@ static void *thr_participant_function(void *arg) {
     cout << "My hostname = " << my_hostname << endl << endl;
 
     cout << "Getting my MAC address..." << endl;
-    FILE *file = fopen("/sys/class/net/enp0s3/address", "r"); //TODO mudar wlo1 -> eth0 (ou o nome certo do diretorio)
+    FILE *file = fopen("/sys/class/net/enp0s3/address",
+                       "r");  // TODO: colocar o nome da interface de rede (ou o nome certo do diretorio)
     i = 0;
     while (fscanf(file, "%c", &my_mac_addr[i]) == 1)
         i++;
@@ -97,7 +73,8 @@ static void *thr_participant_function(void *arg) {
     getifaddrs(&ifap);
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) { //TODO trocar wlo1 -> eth0
+            // TODO: colocar o nome da interface de rede
+            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
@@ -110,101 +87,98 @@ static void *thr_participant_function(void *arg) {
 
     cout << "===============================================" << endl << endl;
 
-    server = gethostbyname("localhost"); //TODO modificar
+    server = gethostbyname("localhost");  // TODO: modificar
 
-    //creates the socket
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+    // creates the socket
+    if ((g_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
         cout << "Socket creation error." << endl;
         exit(0);
     }
 
-    //Set socket broadcast option to true
-    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag, sizeof true_flag);
-    if (ret_value < 0) {
+    // set socket broadcast option to true
+    g_ret_value = setsockopt(g_sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag, sizeof true_flag);
+    if (g_ret_value < 0) {
         cout << "Setsockopt [SO_BROADCAST] error." << endl;
         exit(0);
     }
 
-    //Set socket reuseaddr option to true
-    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &true_flag, sizeof true_flag);
-    if (ret_value < 0) {
+    // set socket reuseaddr option to true
+    g_ret_value = setsockopt(g_sockfd, SOL_SOCKET, SO_REUSEADDR, &true_flag, sizeof true_flag);
+    if (g_ret_value < 0) {
         cout << "Setsockopt [SO_REUSEADDR] error." << endl;
         exit(0);
     }
 
-    //participant receiving address configuration
+    // participant receiving address configuration
     unsigned int serv_addr_len;
 
-    memset(&recv_addr, 0, sizeof recv_addr);
-    recv_addr.sin_family = AF_INET;
-    recv_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
-    recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  //important for broadcast listening
-    //recv_addr.sin_addr.s_addr = inet_addr("192.168.0.10");
+    memset(&g_recv_addr, 0, sizeof g_recv_addr);
+    g_recv_addr.sin_family = AF_INET;
+    g_recv_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
+    g_recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  // important for broadcast listening
+    //g_recv_addr.sin_addr.s_addr = inet_addr("192.168.0.10");
 
-    //manager address configuration
-    memset(&serv_addr, 0, sizeof serv_addr);
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = (in_port_t) htons(PORT_MANAGER_LISTENING);
-//    serv_addr.sin_addr = *((struct in_addr *) server->h_addr);
-    serv_addr.sin_addr.s_addr = inet_addr("192.168.1.3"); // TODO: trocar para o endereco da VM manager
+    // manager address configuration
+    memset(&g_serv_addr, 0, sizeof g_serv_addr);
+    g_serv_addr.sin_family = AF_INET;
+    g_serv_addr.sin_port = (in_port_t) htons(PORT_MANAGER_LISTENING);
+//    g_serv_addr.sin_addr = *((struct in_addr *) server->h_addr);
+    g_serv_addr.sin_addr.s_addr = g_manager_addr;
 
     // bind the participant's listening port
-    ret_value = bind(sockfd, (struct sockaddr *) &recv_addr, sizeof(recv_addr));
-    if (ret_value < 0) {
+    g_ret_value = bind(g_sockfd, (struct sockaddr *) &g_recv_addr, sizeof(g_recv_addr));
+    if (g_ret_value < 0) {
         cout << "Bind socket error." << endl;
         exit(0);
     }
 
     while (true) {
-        //wait for manager's message
+        // wait for manager's message
         cout << "To aguardando msg..." << endl; //TODO debug (apagar depois)
-        ret_value = (int) recvfrom(sockfd, pack, sizeof(*pack), 0, (struct sockaddr *) &from, &serv_addr_len);
-        if (ret_value < 0) {
+        g_ret_value = (int) recvfrom(g_sockfd, pack, sizeof(*pack), 0, (struct sockaddr *) &from, &serv_addr_len);
+        if (g_ret_value < 0) {
             cout << "Recvfrom error." << endl; //TODO tratar esse erro!
             exit(0);
         }
 
-        //TODO debug (apagar depois)
+        // TODO: debug (apagar depois)
         cout << "Pack->payload: " << pack->payload << endl;
 
-        //compare manager's message and work on it based on the right option
+        // compare manager's message and work on it based on the right option
         if (strcmp(pack->payload, SLEEP_SERVICE_DISCOVERY) == 0) {
-            //TODO criar thread Discovery Subservice (?)
-            pack->type = 1; //TODO modificar
-            pack->seqn = seqn;
+            // TODO: criar thread Discovery Subservice (?)
+            pack->type = 1; // TODO: modificar
+            pack->seqn = g_seqn;
             strcpy(pack->payload, "Ha!");
             pack->length = strlen(pack->payload);
-            seqn++;
+            g_seqn++;
 
-            sendto(sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr *) &serv_addr, sizeof serv_addr);
+            sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
         }
 
         if (strcmp(pack->payload, SLEEP_STATUS_REQUEST) == 0) {
-            //TODO criar thread Monitorin Subservice (?)
+            // TODO: criar thread Monitoring Subservice (?)
             pack->type = 1; //TODO modificar
-            pack->seqn = seqn;
+            pack->seqn = g_seqn;
             strcpy(pack->payload, status);
             pack->length = strlen(pack->payload);
-            seqn++;
+            g_seqn++;
 
-            sendto(sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr *) &serv_addr, sizeof serv_addr);
+            sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
         }
     }
-
-    close(sockfd);
-    return 0;
 }
 
 
-//---------------------------------------------------------- MAIN CODE section ----------------------------------------------------------
+// ------------------------------------------------ MAIN CODE section --------------------------------------------------
 int main(int argc, char **argv) {
-    int ret_value;
-    //TODO signal for CTRL+D
-    signal(SIGINT, signalHandler); //CTRL+C
-    signal(SIGHUP, signalHandler); //terminal closed while process still running
+    ssize_t ret_value;
+    // TODO: signal for CTRL+D
+    signal(SIGINT, signalHandler); // CTRL+C
+    signal(SIGHUP, signalHandler); // terminal closed while process still running
 
 
-//---------------------------------------------------------- PARTICIPANT section ----------------------------------------------------------
+// ----------------------------------------------- PARTICIPANT section -------------------------------------------------
     if (argc == 1) {
         pthread_t thr_participant;
         pthread_attr_t attr;
@@ -220,30 +194,30 @@ int main(int argc, char **argv) {
         pthread_join(thr_participant, nullptr);
     }
 
-//------------------------------------------------------------ MANAGER section ------------------------------------------------------------
-    //argv[1] does exist.
+// ------------------------------------------------- MANAGER section ---------------------------------------------------
+    // argv[1] does exist.
     if (argc == 2) {
-        int n_machines = 0; //number of machines connected
+        int n_machines = 0; // number of machines connected
         int sockfd, seqn = 1;
         int true_flag = true;
         char buffer[BUFFER_SIZE] = {0};
         socklen_t participant_len;
-        struct sockaddr_in manager_addr, broadcast_addr, participant_addr;
-        managerDB manDb[MAX_MACHINES]; //structure hold by manager
+        struct sockaddr_in manager_addr{}, broadcast_addr{}, participant_addr{};
+        managerDB manDb[MAX_MACHINES]; // structure hold by manager
         auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
-        if (strcmp(argv[1], "manager") != 0) { //argv[1] != "manager"
+        if (strcmp(argv[1], "manager") != 0) { // argv[1] != "manager"
             cout << "argv NOT OK" << endl;
             return -1;
         }
 
-        //creates manager socket
+        // creates manager socket
         if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
             cout << "Socket creation error";
             exit(0);
         }
 
-        //set socket options broadcast and reuseaddr to true
+        // set socket options broadcast and reuseaddr to true
         ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag, sizeof true_flag);
         if (ret_value < 0) {
             cout << "Setsockopt [SO_BROADCAST] error." << endl;
@@ -256,51 +230,50 @@ int main(int argc, char **argv) {
             exit(0);
         }
 
-        //configure manager's sending and broadcast addresses
-        memset(&manager_addr, 0, sizeof manager_addr);
+        // configure manager's listening address
         manager_addr.sin_family = AF_INET;
         manager_addr.sin_port = (in_port_t) htons(PORT_MANAGER_LISTENING);
         manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        //manager_addr.sin_addr.s_addr = inet_addr("192.168.0.10");
 
-
-        memset(&broadcast_addr, 0, sizeof broadcast_addr);
+        // configure manager's broadcast address
         broadcast_addr.sin_family = AF_INET;
         broadcast_addr.sin_port = (in_port_t) htons(PORT_PARTICIPANT_LISTENING);
-//        inet_aton("127.255.255.255", &broadcast_addr.sin_addr);
-        inet_aton("192.168.1.255", &broadcast_addr.sin_addr); // TODO: trocar para o endereco de broadcast da rede local
+        broadcast_addr.sin_addr.s_addr = g_broadcast_addr;
 
+        // bind the manager's socket to the listening port
         ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, sizeof manager_addr);
         if (ret_value < 0) {
             cout << "Bind socket error." << endl;
             exit(0);
         }
 
-        //TODO debug (apagar depois)
+        // TODO: debug (apagar depois)
         int n = 0;
 
         participant_len = sizeof(struct sockaddr_in);
 
         while (true) {
-            //sending in broadcast
-            pack->type = 1; //TODO modificar
+
+            // -------------------------------------- DISCOVERY SUBSERVICE ---------------------------------------------
+            // sending in broadcast
+            pack->type = 1; // TODO: modificar
             pack->seqn = seqn;
             strcpy(pack->payload, SLEEP_SERVICE_DISCOVERY);
             pack->length = strlen(pack->payload);
             seqn++;
 
             ret_value = (int) sendto(sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr *) &broadcast_addr,
-                               sizeof broadcast_addr);
+                                     sizeof broadcast_addr);
             if (ret_value < 0) {
                 cout << "Sendto error." << endl;
                 exit(0);
             }
 
-            //TODO debug...
+            // TODO: debug...
             n++;
             cout << "Enviei (x" << n << ")" << " [" << pack->payload << "]" << endl;
 
-            //receiving packets
+            // receiving packets
             ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0, (struct sockaddr *) &participant_addr,
                                  &participant_len);
             if (ret_value < 0) {
@@ -309,14 +282,15 @@ int main(int argc, char **argv) {
             }
 
             cout << "Received dgram type: " << pack->type << endl;
-            cout << "Received dgram seqn: " << pack->seqn << endl;
+            cout << "Received dgram g_seqn: " << pack->seqn << endl;
             cout << "Received dgram payload: " << pack->payload << endl;
             cout << "Received dgram length: " << pack->length << endl << endl;
 
             sleep(3);
 
-            //TODO debug
-            pack->type = 1; //TODO modificar
+            // ------------------------------------- MONITORING SUBSERVICE ---------------------------------------------
+            // TODO: debug
+            pack->type = 1; // TODO: modificar
             pack->seqn = seqn;
             strcpy(pack->payload, SLEEP_STATUS_REQUEST);
             pack->length = strlen(pack->payload);
@@ -330,11 +304,11 @@ int main(int argc, char **argv) {
                 exit(0);
             }
 
-            //TODO debug...
+            // TODO: debug...
             n++;
             cout << "Enviei (x" << n << ")" << " [" << pack->payload << "]" << endl;
 
-            //receiving packets
+            // receiving packets
             ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0, (struct sockaddr *) &participant_addr,
                                  &participant_len);
             if (ret_value < 0) {
@@ -343,14 +317,12 @@ int main(int argc, char **argv) {
             }
 
             cout << "Received dgram type: " << pack->type << endl;
-            cout << "Received dgram seqn: " << pack->seqn << endl;
+            cout << "Received dgram g_seqn: " << pack->seqn << endl;
             cout << "Received dgram payload: " << pack->payload << endl;
             cout << "Received dgram length: " << pack->length << endl << endl;
 
             sleep(3);
         }
-
-        close(sockfd);
     }
 
     return 0;
