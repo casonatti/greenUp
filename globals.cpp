@@ -36,5 +36,5 @@ struct packet {
 int g_sockfd, g_ret_value, g_seqn = 1;
 in_addr_t g_manager_addr = inet_addr("192.168.1.13"); // trocar para o endereco da VM manager
 in_addr_t g_broadcast_addr = inet_addr("192.168.1.255"); // trocar para o endereco de broadcast da rede local
-struct sockaddr_in g_recv_addr, g_serv_addr;
+struct sockaddr_in g_recv_addr{}, g_serv_addr{};
 struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
