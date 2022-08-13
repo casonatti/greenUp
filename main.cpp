@@ -66,7 +66,7 @@ void signalHandler(int signum) {
 }
 
 static void * thr_participant_function(void* arg) {
-    int sockfd, ret_value, i, seqn = 1;
+    int sockfd, ret_value, i, seqn;
     int true_flag = true;
     char buffer[BUFFER_SIZE] = {0};
     char my_hostname[32];
@@ -76,7 +76,7 @@ static void * thr_participant_function(void* arg) {
     struct sockaddr_in recv_addr, serv_addr, from, *teste;
     struct hostent *server, *participant;
     struct ifaddrs *ifap, *ifa;
-    struct packet pack;
+    struct packet * pack = (struct packet *) malloc(sizeof(packet));
 
     cout << "========= Configurando o Participante =========" << endl;
 
@@ -159,37 +159,36 @@ static void * thr_participant_function(void* arg) {
     while(true) {
         //wait for manager's message
         cout << "To aguardando msg..." << endl; //TODO debug (apagar depois)
-        memset(buffer, '\0', BUFFER_SIZE);
-        ret_value = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&from, &serv_addr_len);
+        ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0, (struct sockaddr*)&from, &serv_addr_len);
         if(ret_value < 0) {
             cout << "Recvfrom error." << endl; //TODO tratar esse erro!
             exit(0);
         }
 
         //TODO debug (apagar depois)
-        cout << "Buffer: " << buffer << endl;
+        cout << "Pack->payload: " << pack->payload << endl;
 
         //compare manager's message and work on it based on the right option
-        if(strcmp(buffer, SLEEP_SERVICE_DISCOVERY) == 0) {
+        if(strcmp(pack->payload, SLEEP_SERVICE_DISCOVERY) == 0) {
             //TODO criar thread Discovery Subservice (?)
-            pack.type = 1; //TODO modificar
-            pack.seqn = seqn;
-            //pack.payload = "Teste!";
-            strcpy(pack.payload, "Teste!");
-            pack.length = strlen(pack.payload);
+            pack->type = 1; //TODO modificar
+            pack->seqn = seqn;
+            strcpy(pack->payload, "Ha!");
+            pack->length = strlen(pack->payload);
             seqn++;
 
-            //strcpy(buffer, "resposta participante!");
-            //cout << "Enviando mensagem: " << buffer << endl; //TODO apagar depois
-            sendto(sockfd, (struct __packet *)&pack, (1024 + sizeof(pack)), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
+            sendto(sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
         }
 
-        if(strcmp(buffer, SLEEP_STATUS_REQUEST) == 0) {
-            cout << "Entrei aqui (SLEEP_STATUS_REQUEST)!" << endl;
+        if(strcmp(pack->payload, SLEEP_STATUS_REQUEST) == 0) {
             //TODO criar thread Monitorin Subservice (?)
-            strcpy(buffer, status);
-            cout << "Enviando status: " << endl; //TODO apagar depois
-            sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
+            pack->type = 1; //TODO modificar
+            pack->seqn = seqn;
+            strcpy(pack->payload, status);
+            pack->length = strlen(pack->payload);
+            seqn++;
+
+            sendto(sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr*) &serv_addr, sizeof serv_addr);
         }
     }
 
@@ -226,7 +225,7 @@ int main(int argc, char** argv) {
     //argv[1] does exist.
     if(argc == 2) {
         int n_machines = 0; //number of machines connected
-        int sockfd;
+        int sockfd, seqn = 1;
         int true_flag = true;
         char buffer[BUFFER_SIZE] = {0};
         socklen_t participant_len;
@@ -281,23 +280,59 @@ int main(int argc, char** argv) {
         //TODO debug (apagar depois)
         int n = 0;
 
-        //TODO teste...
         participant_len = sizeof(struct sockaddr_in);
 
         while(true) {
-            memset(buffer, '\0', BUFFER_SIZE);
             //sending in broadcast
-            ret_value = sendto(sockfd, SLEEP_SERVICE_DISCOVERY, strlen(SLEEP_SERVICE_DISCOVERY), 0, (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+            pack->type = 1; //TODO modificar
+            pack->seqn = seqn;
+            strcpy(pack->payload, SLEEP_SERVICE_DISCOVERY);
+            pack->length = strlen(pack->payload);
+            seqn++;
+
+            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
             if(ret_value < 0) {
                 cout << "Sendto error." << endl;
                 exit(0);
             }
 
+            //TODO debug...
             n++;
-            cout << "Enviei (x" << n << ")" << endl;
+            cout << "Enviei (x" << n << ")" << " [" << pack->payload << "]" << endl;
 
-            memset(buffer, '\0', BUFFER_SIZE);
-            // ret_value = recv(sockfd, buffer, sizeof(buffer)-1, 0);
+            //receiving packets
+            ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0, (struct sockaddr *) &participant_addr, &participant_len);
+            if(ret_value < 0) {
+                cout << "Recvfrom error.";
+                exit(0);
+            }
+
+            cout << "Received dgram type: " << pack->type << endl;
+            cout << "Received dgram seqn: " << pack->seqn << endl;
+            cout << "Received dgram payload: " << pack->payload << endl;
+            cout << "Received dgram length: " << pack->length << endl << endl;
+
+            sleep(3);
+
+            //TODO debug
+            pack->type = 1; //TODO modificar
+            pack->seqn = seqn;
+            strcpy(pack->payload, SLEEP_STATUS_REQUEST);
+            pack->length = strlen(pack->payload);
+            seqn++;
+
+
+            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0, (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+            if(ret_value < 0) {
+                cout << "Sendto error." << endl;
+                exit(0);
+            }
+
+            //TODO debug...
+            n++;
+            cout << "Enviei (x" << n << ")" << " [" << pack->payload << "]" << endl;
+
+            //receiving packets
             ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0, (struct sockaddr *) &participant_addr, &participant_len);
             if(ret_value < 0) {
                 cout << "Recvfrom error.";
