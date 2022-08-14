@@ -1,5 +1,4 @@
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <cstdlib> // exit() precisa desse include nos labs do inf
 
 // -------------------------------------------------- CONSTANTS --------------------------------------------------------
@@ -8,7 +7,7 @@
 #define PORT_DISCOVERY_SERVICE_BROADCAST 8000
 #define PORT_DISCOVERY_SERVICE_LISTENER 8001
 #define PORT_MONITORING_SERVICE_BROADCAST 9000
-#define PORT_MONITORING_SERVICE_LISTENER 9000
+#define PORT_MONITORING_SERVICE_LISTENER 9001
 #define TYPE_EXIT 3
 
 #define SLEEP_SERVICE_DISCOVERY "sleep service discovery"
@@ -27,7 +26,6 @@ struct packet {
     uint16_t type;              // DATA | CMD
     uint16_t seqn;              // sequence number
     uint16_t length;            // payload length
-    uint16_t timestamp;         // packet timestamp
     char payload[BUFFER_SIZE];  // packet data
 };
 
