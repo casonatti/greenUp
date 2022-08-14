@@ -83,7 +83,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
     }
 
     while (true) {
-        cout << "[DISCOVERY] To aguardando msg..." << endl; // TODO: debug (apagar depois)
+        cout << "[D] To aguardando msg..." << endl; // TODO: debug (apagar depois)
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
         if (ret_value < 0) {
@@ -91,11 +91,11 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             exit(0);
         }
 
-        cout << "[DISCOVERY] Packet from: " << inet_ntoa(manager_addr.sin_addr) << endl;
-        cout << "[DISCOVERY] Received dgram type: " << pack->type << endl;
-        cout << "[DISCOVERY] Received dgram seqn: " << pack->seqn << endl;
-        cout << "[DISCOVERY] Received dgram payload: " << pack->payload << endl;
-        cout << "[DISCOVERY] Received dgram length: " << pack->length << endl << endl;
+        cout << "[D] Packet from: " << inet_ntoa(manager_addr.sin_addr) << endl;
+        cout << "[D] Received dgram type: " << pack->type << endl;
+        cout << "[D] Received dgram seqn: " << pack->seqn << endl;
+        cout << "[D] Received dgram payload: " << pack->payload << endl;
+        cout << "[D] Received dgram length: " << pack->length << endl << endl;
 
         strcpy(pack->payload, "Ha!");
         pack->type = 1; // TODO: modificar
@@ -183,7 +183,7 @@ static void *thr_manager_discovery_service(__attribute__((unused)) void *arg) {
             }
 
             // TODO: debug...
-            cout << "[DISCOVERY] Enviei (x" << seqn++ << ")" << " [" << pack->payload << "]" << endl;
+            cout << "[D] Enviei (x" << seqn++ << ")" << " [" << pack->payload << "]" << endl;
 
             sleep(5);
         }
@@ -196,11 +196,11 @@ static void *thr_manager_discovery_service(__attribute__((unused)) void *arg) {
                 exit(0);
             }
 
-            cout << "[DISCOVERY] Packet from: " << inet_ntoa(participant_addr.sin_addr) << endl;
-            cout << "[DISCOVERY] Received dgram type: " << pack->type << endl;
-            cout << "[DISCOVERY] Received dgram g_seqn: " << pack->seqn << endl;
-            cout << "[DISCOVERY] Received dgram payload: " << pack->payload << endl;
-            cout << "[DISCOVERY] Received dgram length: " << pack->length << endl << endl;
+            cout << "[D] Packet from: " << inet_ntoa(participant_addr.sin_addr) << endl;
+            cout << "[D] Received dgram type: " << pack->type << endl;
+            cout << "[D] Received dgram g_seqn: " << pack->seqn << endl;
+            cout << "[D] Received dgram payload: " << pack->payload << endl;
+            cout << "[D] Received dgram length: " << pack->length << endl << endl;
 
             // TODO: logica para o banco de clients
         }
@@ -249,7 +249,7 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
     }
 
     while (true) {
-        cout << "[MONITORING] To aguardando msg..." << endl; // TODO: debug (apagar depois)
+        cout << "[M] To aguardando msg..." << endl; // TODO: debug (apagar depois)
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
         if (ret_value < 0) {
@@ -257,11 +257,11 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             exit(0);
         }
 
-        cout << "[MONITORING] Packet from: " << inet_ntoa(manager_addr.sin_addr) << endl;
-        cout << "[MONITORING] Received dgram type: " << pack->type << endl;
-        cout << "[MONITORING] Received dgram seqn: " << pack->seqn << endl;
-        cout << "[MONITORING] Received dgram payload: " << pack->payload << endl;
-        cout << "[MONITORING] Received dgram length: " << pack->length << endl << endl;
+        cout << "[M] Packet from: " << inet_ntoa(manager_addr.sin_addr) << endl;
+        cout << "[M] Received dgram type: " << pack->type << endl;
+        cout << "[M] Received dgram seqn: " << pack->seqn << endl;
+        cout << "[M] Received dgram payload: " << pack->payload << endl;
+        cout << "[M] Received dgram length: " << pack->length << endl << endl;
 
         strcpy(pack->payload, "Awake!");
         pack->type = 1; // TODO: modificar
@@ -348,7 +348,7 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
             }
 
             // TODO: debug...
-            cout << "[MONITORING] Enviei (x" << seqn++ << ")" << " [" << pack->payload << "]" << endl;
+            cout << "[M] Enviei (x" << seqn++ << ")" << " [" << pack->payload << "]" << endl;
 
             sleep(8);
         }
@@ -361,11 +361,11 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
                 exit(0);
             }
 
-            cout << "[MONITORING] Packet from: " << inet_ntoa(participant_addr.sin_addr) << endl;
-            cout << "[MONITORING] Received dgram type: " << pack->type << endl;
-            cout << "[MONITORING] Received dgram g_seqn: " << pack->seqn << endl;
-            cout << "[MONITORING] Received dgram payload: " << pack->payload << endl;
-            cout << "[MONITORING] Received dgram length: " << pack->length << endl << endl;
+            cout << "[M] Packet from: " << inet_ntoa(participant_addr.sin_addr) << endl;
+            cout << "[M] Received dgram type: " << pack->type << endl;
+            cout << "[M] Received dgram g_seqn: " << pack->seqn << endl;
+            cout << "[M] Received dgram payload: " << pack->payload << endl;
+            cout << "[M] Received dgram length: " << pack->length << endl << endl;
 
             // TODO: logica para o banco de clients
         }
