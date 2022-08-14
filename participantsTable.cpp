@@ -1,8 +1,14 @@
 #include <iostream>
 #include <cstring>
-#include "globals.cpp"
 #include <map>
 using namespace std;
+
+struct participant {
+    const char *hostname;       // Participant hostname
+    const char *MAC;            // Participant MAC address
+    const char *IP;             // Participant IP address
+    char *status;               // Participant Status
+};
 
 class participantsTable{
     public:
@@ -14,13 +20,11 @@ class participantsTable{
         void updateTable(participant p);
         void deleteParticipant(const char* IPaddress);
         void printTable();
-        void sleepParticipant(const char* IPaddress);
         bool isAwake(const char* IPaddress);
+        void sleepTable();
 };
 
 void participantsTable::updateTable(participant p){
-    if(isAwake(p.IP))
-        return;
     strcpy(p.status, "awake");
     table.insert_or_assign(p.IP, p);
     return;
@@ -31,11 +35,6 @@ void participantsTable::deleteParticipant(const char* IPaddress){
     return;
 }
 
-void participantsTable::sleepParticipant(const char* IPaddress){
-    participant p = table.at(IPaddress);
-    strcpy(p.status, "awake");
-    table.insert_or_assign(IPaddress, p);
-}
 
 void participantsTable::printTable(){
     cout << "---------------------------------------------------------\n";
@@ -56,6 +55,10 @@ bool participantsTable::isAwake(const char* address){
         return strcmp(p.status, "awake") == 0;
     }
     return false;
+}
+
+void participantsTable::sleepTable(){
+    return;
 }
 
 participant parsePayload(char* payLoad){
