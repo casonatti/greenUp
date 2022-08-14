@@ -17,10 +17,10 @@
 // ------------------------------------------------- STRUCTURES --------------------------------------------------------
 
 struct managerDB {
-    const char *hostname;
-    const char *MAC;
-    const char *IP;
-    const char *status;
+    const char *hostname;       // Participant hostname
+    const char *MAC;            // Participant MAC address
+    const char *IP;             // Participant IP address
+    const char *status;         // Participant Status
 };
 
 struct packet {
