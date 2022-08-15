@@ -20,7 +20,7 @@ struct packet {
     uint16_t type;              // DATA | CMD
     uint16_t seqn;              // sequence number
     uint16_t length;            // payload length
-    char payload[BUFFER_SIZE];  // packet data
+    char payload[BUFFER_SIZE];// packet data
 };
 
 // -------------------------------------------------- VARIABLES --------------------------------------------------------
@@ -30,3 +30,4 @@ int g_sockfd, g_seqn = 1;
 struct sockaddr_in g_serv_addr{};
 struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
 participantsTable table;
+string my_hostname, my_mac_addr, my_ip_addr;

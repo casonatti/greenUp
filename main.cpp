@@ -10,12 +10,15 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <cstdlib> // exit() precisa desse include nos labs do inf
+#include <mutex>
 
 using namespace std;
 
 // ------------------------------------------------ GLOBAL VAR section -------------------------------------------------
 
 #include "globals.cpp"
+int banana = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -27,19 +30,37 @@ void signalHandler(int signum) {
 
     sendto(g_sockfd, g_pack, (1024 + sizeof(*g_pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
 
-    //recv(sock, buffer, BUFFER_SIZE, 0);
-    //cout << "received message from server: \"" << buffer << "\"" << endl << endl;
-
-    //cout << "sending message to server: \"" << exit_message << "\"" << endl;
-    //send(sock, exit_message, strlen(exit_message), 0);
-
-    //recv(sock, buffer, BUFFER_SIZE, 0);
-    //cout << "received message from server: \"" << buffer << "\"" << endl << endl;
-
-    //close(sock);
-
     exit(signum);
 }
+
+participant parsePayload(string payLoad){
+    std::string s;
+    std::string delimiter = ", ";
+    participant p;
+    int i = 0;
+
+    s = payLoad;
+    size_t pos = 0;
+    std::string token;
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token = s.substr(0, pos);
+        std::cout << token << std::endl;
+        switch (i)
+        {
+        case 0:
+            p.hostname = token;
+            break;
+        case 1:
+            p.MAC = token;
+            break;  
+        }
+        s.erase(0, pos + delimiter.length());
+        i++;
+    }
+    p.IP = s;
+    return p;
+}
+
 
 static void *thr_participant_discovery_service(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
@@ -97,7 +118,12 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
         cout << "[D] Received dgram payload: " << pack->payload << endl;
         cout << "[D] Received dgram length: " << pack->length << endl << endl;
 
-        strcpy(pack->payload, "Ha!");
+        pthread_mutex_lock(&mtx);
+        cout << ++banana << endl;
+        pthread_mutex_unlock(&mtx);
+        string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
+        strcpy(pack->payload, s_payload.data());
+        cout << pack->payload;
         pack->type = 1; // TODO: modificar
         pack->length = strlen(pack->payload);
 
@@ -181,6 +207,9 @@ static void *thr_manager_discovery_service(__attribute__((unused)) void *arg) {
                 cout << "Sendto error." << endl;
                 exit(0);
             }
+            table.sleepTable();
+            cout << "printando tabela sleep \n";
+            table.printTable();
 
             // TODO: debug...
             cout << "[D] Enviei (x" << seqn++ << ")" << " [" << pack->payload << "]" << endl;
@@ -203,6 +232,9 @@ static void *thr_manager_discovery_service(__attribute__((unused)) void *arg) {
             cout << "[D] Received dgram length: " << pack->length << endl << endl;
 
             // TODO: logica para o banco de clients
+            participant p = parsePayload(pack->payload);
+            table.updateTable(p);
+            table.printTable();
         }
     }
 }
@@ -263,10 +295,14 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
         cout << "[M] Received dgram payload: " << pack->payload << endl;
         cout << "[M] Received dgram length: " << pack->length << endl << endl;
 
-        strcpy(pack->payload, "Awake!");
+        pthread_mutex_lock(&mtx);
+        cout << ++banana << endl;
+        pthread_mutex_unlock(&mtx);
+
+        string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
+        strcpy(pack->payload, s_payload.data());
         pack->type = 1; // TODO: modificar
         pack->length = strlen(pack->payload);
-
         ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
                            (struct sockaddr *) &manager_addr, sizeof manager_addr);
         if (ret_value < 0) {
@@ -346,7 +382,9 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
                 cout << "Sendto error." << endl;
                 exit(0);
             }
-
+            table.sleepTable();
+            cout << "printando tabela sleep \n";
+            table.printTable();
             // TODO: debug...
             cout << "[M] Enviei (x" << seqn++ << ")" << " [" << pack->payload << "]" << endl;
 
@@ -368,6 +406,9 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
             cout << "[M] Received dgram length: " << pack->length << endl << endl;
 
             // TODO: logica para o banco de clients
+            participant p = parsePayload(pack->payload);
+            table.updateTable(p);
+            table.printTable();
         }
     }
 }
@@ -375,7 +416,6 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
 static void *thr_participant_function(__attribute__((unused)) void *arg) {
     int i;
     ssize_t ret_value;
-    char my_hostname[32], my_mac_addr[16], *my_ip_addr;
     const char *status;
     struct sockaddr_in *teste;
     struct ifaddrs *ifap, *ifa;
@@ -383,15 +423,20 @@ static void *thr_participant_function(__attribute__((unused)) void *arg) {
     cout << "========= Configurando o Participante =========" << endl;
 
     cout << "Getting my hostname..." << endl;
-    gethostname(my_hostname, sizeof(my_hostname));
+    char c_my_hostname[32];
+    gethostname(c_my_hostname, 32);
+    my_hostname = c_my_hostname;
     cout << "My hostname = " << my_hostname << endl << endl;
 
     cout << "Getting my MAC address..." << endl;
-    FILE *file = fopen("/sys/class/net/enp0s3/address",
+    FILE *file = fopen("/sys/class/net/wlo1/address",
                        "r");  // TODO: colocar o nome da interface de rede (ou o nome certo do diretorio)
     i = 0;
-    while (fscanf(file, "%c", &my_mac_addr[i]) == 1)
+    char c_my_mac_addr[17];
+    while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1){
+        my_mac_addr += c_my_mac_addr[i];
         i++;
+    }
     cout << "My MAC address = " << my_mac_addr << endl << endl;
     fclose(file);
 
@@ -402,7 +447,7 @@ static void *thr_participant_function(__attribute__((unused)) void *arg) {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
@@ -479,6 +524,9 @@ int main(int argc, char **argv) {
     signal(SIGINT, signalHandler); // CTRL+C
     signal(SIGHUP, signalHandler); // terminal closed while process still running
 
+    pthread_mutex_lock(&mtx);
+    cout << ++banana << endl;
+    pthread_mutex_unlock(&mtx);
 // ----------------------------------------------- PARTICIPANT section -------------------------------------------------
 
     ssize_t ret_value;
