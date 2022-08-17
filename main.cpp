@@ -108,13 +108,14 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             cout << "Recvfrom error.";
             exit(0);
         }
-
+        pthread_mutex_lock(&mtx);
         cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
+        pthread_mutex_unlock(&mtx);
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
 //        cout << pack->payload;
-        pack->type = 1; // TODO: modificar
+        pack->type = TYPE_DISCOVERY;
         pack->length = strlen(pack->payload);
 
         ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
@@ -176,7 +177,7 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
 
     // loop responsible for broadcasting discovery packets
     while (true) {
-        pack->type = 1; // TODO: modificar
+        pack->type = TYPE_DISCOVERY;
         pack->seqn = seqn++;
         strcpy(pack->payload, SLEEP_SERVICE_DISCOVERY);
         pack->length = strlen(pack->payload);
@@ -254,9 +255,8 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             cout << "Recvfrom error.";
             exit(0);
         }
-
-        cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
         pthread_mutex_lock(&mtx);
+        cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
         cout << ++banana << endl;
         pthread_mutex_unlock(&mtx);
 
@@ -346,11 +346,13 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             exit(0);
         }
 
+        pthread_mutex_lock(&mtx);
         cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
+        pthread_mutex_unlock(&mtx);
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
-        pack->type = 1; // TODO: modificar
+        pack->type = TYPE_MONITORING;
         pack->length = strlen(pack->payload);
         ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
                            (struct sockaddr *) &manager_addr, sizeof manager_addr);
@@ -410,7 +412,7 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
 
     // loop responsible for broadcasting monitoring packets
     while (true) {
-        pack->type = 1; // TODO: modificar
+        pack->type = TYPE_MONITORING;
         pack->seqn = seqn++;
         strcpy(pack->payload, SLEEP_STATUS_REQUEST);
         pack->length = strlen(pack->payload);
@@ -486,8 +488,8 @@ static void *thr_manager_monitoring_listener(__attribute__((unused)) void *arg) 
             exit(0);
         }
 
-        cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
         pthread_mutex_lock(&mtx);
+        cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
         cout << ++banana << endl;
         pthread_mutex_unlock(&mtx);
 
@@ -544,7 +546,7 @@ static void participant_function() {
     cout << "My hostname = " << my_hostname << endl << endl;
 
     cout << "Getting my MAC address..." << endl;
-    FILE *file = fopen("/sys/class/net/enp0s3/address",
+    FILE *file = fopen("/sys/class/net/wlo1/address",
                        "r");  // TODO: colocar o nome da interface de rede (ou o nome certo do diretorio)
     i = 0;
     char c_my_mac_addr[17];
@@ -562,7 +564,7 @@ static void participant_function() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
