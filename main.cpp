@@ -193,7 +193,18 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
 //        cout << "printando tabela sleep \n";
 //        table.printTable();
 
-        // TODO: debug...
+        // wake on lan test
+        string message = "\xFF\xFF\xFF\xFF\xFF\xFF";
+        string mac_addr = "\xAB\xCD\xEF\x01\x23\x45";
+        for (int i = 16; i > 0; i--) {
+            message += mac_addr;
+        }
+        ret_value = sendto(sockfd, message.c_str(), message.length(), 0,
+                           (struct sockaddr *) &broadcast_addr,sizeof broadcast_addr);
+        if (ret_value < 0) {
+            cout << "Sendto error." << endl;
+            exit(0);
+        }
 
         sleep(5);
     }
