@@ -59,6 +59,38 @@ void signalHandler(int signum) {
 //    return p;
 //}
 
+static void *thr_participant_interface_service(__attribute__((unused)) void *arg) {
+    char buffer[32];
+    int true_flag = true;
+    ssize_t ret_value;
+    auto *pack = (struct packet *) malloc(sizeof(struct packet));
+
+    // creates participant's discovery socket
+    g_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (g_sockfd < 0) {
+        cout << "Socket creation error";
+        exit(0);
+    }
+
+    while(true) {
+        cin.getline(buffer, 32);
+        if(strcmp(buffer, "EXIT") == 0) {
+            cout << "Sending command EXIT..." << endl;
+            pack->type = TYPE_EXIT;
+            strcpy(pack->payload, "EXIT");
+            pack->length = strlen(pack->payload);
+            pack->seqn = 0;
+
+            ret_value = sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0,
+                           (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
+            if (ret_value < 0) {
+                cout << "Sendto error.";
+                exit(0);
+            }
+        }
+    }
+}
+
 
 static void *thr_participant_discovery_service(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
@@ -111,6 +143,8 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
         pthread_mutex_lock(&mtx);
         cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
         pthread_mutex_unlock(&mtx);
+
+        g_serv_addr = manager_addr;
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
@@ -590,8 +624,8 @@ static void participant_function() {
 
     // ---------------------------------------------- SUBSERVICES ------------------------------------------------------
 
-    pthread_t thr_discovery, thr_monitoring;
-    pthread_attr_t attr_discovery, attr_monitoring;
+    pthread_t thr_discovery, thr_monitoring, thr_interface;
+    pthread_attr_t attr_discovery, attr_monitoring, attr_interface;
 
     ret_value = pthread_attr_init(&attr_discovery);
     if (ret_value != 0) {
@@ -603,14 +637,22 @@ static void participant_function() {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
+    ret_value = pthread_attr_init(&attr_interface);
+    if (ret_value != 0) {
+        cout << "Pthread_attr_init error." << endl;
+        exit(0);
+    }
 
     pthread_create(&thr_discovery, &attr_discovery, &thr_participant_discovery_service,
                    nullptr);
     pthread_create(&thr_monitoring, &attr_monitoring, &thr_participant_monitoring_service,
                    nullptr);
+    pthread_create(&thr_interface, &attr_interface, &thr_participant_interface_service,
+                   nullptr);
 
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
+    pthread_join(thr_interface, nullptr);
 }
 
 static void manager_function() {
