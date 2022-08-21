@@ -61,12 +61,12 @@ participant parsePayload(string payLoad) {
 
 static void *thr_participant_interface_service(__attribute__((unused)) void *arg) {
     char buffer[32];
-    ssize_t ret_value;
+    int sockfd;
     auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
     // creates participant's discovery socket
-    g_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (g_sockfd < 0) {
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
         cout << "Socket creation error";
         exit(0);
     }
@@ -82,10 +82,99 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
             pack->length = strlen(pack->payload);
             pack->seqn = 0;
 
-            ret_value = sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0,
-                               (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
+            sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                   (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
             exit(0);
         }
+    }
+}
+
+[[noreturn]] static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
+    int sockfd, true_flag = true;
+    ssize_t ret_value;
+    struct sockaddr_in manager_addr{}, broadcast_addr{};
+
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        cout << "Socket creation error";
+        exit(0);
+    }
+
+    // set socket options broadcast and reuseaddr to true
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_BROADCAST] error." << endl;
+        exit(0);
+    }
+
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_REUSEADDR] error." << endl;
+        exit(0);
+    }
+
+    // configure manager's discovery listening address
+    manager_addr.sin_family = AF_INET;
+    manager_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_LISTENER);
+    manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    // configure manager's discovery broadcast address
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_BROADCAST);
+    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
+    // bind the manager's discovery socket to the listening port
+    ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, sizeof(manager_addr));
+    if (ret_value < 0) {
+        cout << "Bind socket error." << endl;
+        exit(0);
+    }
+
+    // creates participant's discovery socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        cout << "Socket creation error";
+        exit(0);
+    }
+
+    while (true) {
+        char buffer[32];
+        cin.getline(buffer, 32);
+        stringstream stream(buffer);
+
+        string word;
+        stream >> word;
+        if (word != "WAKE") {
+            pthread_mutex_lock(&mtx);
+            cout << "Usage: WAKE <hostname>" << endl;
+            pthread_mutex_unlock(&mtx);
+            stream.clear();
+            continue;
+        }
+
+        stream >> word;
+        string macaddr = table.getParticipantMac(word);
+        if (macaddr.empty()) {
+            pthread_mutex_lock(&mtx);
+            cout << "Hostname not found" << endl;
+            pthread_mutex_unlock(&mtx);
+            stream.clear();
+            continue;
+        }
+
+        string message_mac;
+        string message = "\xFF\xFF\xFF\xFF\xFF\xFF";
+        for (int i = 0; i < macaddr.length(); i += 3) {
+            message_mac += static_cast<char>(stoul(macaddr.substr(i, 2), nullptr, 16) & 0xFF);
+        }
+
+        for (int i = 16; i > 0; i--) {
+            message += message_mac;
+        }
+        sendto(sockfd, message.c_str(), message.length(), 0,
+               (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
     }
 }
 
@@ -528,7 +617,7 @@ static void participant_function() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
+    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -542,13 +631,11 @@ static void participant_function() {
 
     cout << "Getting my IP address..." << endl;
     pthread_mutex_unlock(&mtx);
-    //participant = gethostbyname(my_hostname);
-    //my_ip_addr = inet_ntoa(*((struct in_addr*) participant->h_addr_list[0]));
     getifaddrs(&ifap);
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
+            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
@@ -598,8 +685,8 @@ static void manager_function() {
     // ---------------------------------------------- SUBSERVICES ------------------------------------------------------
 
     ssize_t ret_value;
-    pthread_t thr_discovery, thr_monitoring;
-    pthread_attr_t attr_discovery, attr_monitoring;
+    pthread_t thr_discovery, thr_monitoring, thr_interface;
+    pthread_attr_t attr_discovery, attr_monitoring, attr_interface;
 
     ret_value = pthread_attr_init(&attr_discovery);
     if (ret_value != 0) {
@@ -611,14 +698,19 @@ static void manager_function() {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
+    ret_value = pthread_attr_init(&attr_interface);
+    if (ret_value != 0) {
+        cout << "Pthread_attr_init error." << endl;
+        exit(0);
+    }
 
-    pthread_create(&thr_discovery, &attr_discovery, &thr_manager_discovery_service,
-                   nullptr);
-    pthread_create(&thr_monitoring, &attr_monitoring, &thr_manager_monitoring_service,
-                   nullptr);
+    pthread_create(&thr_discovery, &attr_discovery, &thr_manager_discovery_service, nullptr);
+    pthread_create(&thr_monitoring, &attr_monitoring, &thr_manager_monitoring_service, nullptr);
+    pthread_create(&thr_interface, &attr_interface, &thr_manager_interface_service, nullptr);
 
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
+    pthread_join(thr_interface, nullptr);
 }
 
 // ------------------------------------------------ MAIN CODE section --------------------------------------------------

@@ -7,17 +7,15 @@
 using namespace std;
 
 struct participant {
-    string hostname;       // Participant hostname
-    string MAC;           // Participant MAC address
-    string IP;             // Participant IP address
-    string status;         // Participant Status
+    string hostname;  // Participant hostname
+    string MAC;       // Participant MAC address
+    string IP;        // Participant IP address
+    string status;    // Participant status
 };
 
 class participantsTable {
 public:
-    participantsTable() {
-        table;
-    }
+    participantsTable() = default;
 
     std::map<string, participant> table;
 
@@ -32,6 +30,8 @@ public:
     void wakeParticipant(const string &IPAddress);
 
     std::list<string> getAllParticipantsIP();
+
+    string getParticipantMac(const string &hostname);
 };
 
 void participantsTable::addParticipant(participant p) {
@@ -72,4 +72,14 @@ std::list<string> participantsTable::getAllParticipantsIP() {
         listP.insert(it, ent.second.IP);
     }
     return listP;
+}
+
+string participantsTable::getParticipantMac(const string& hostname) {
+    std::string macaddr = {};
+    for (auto &ent: table) {
+        if (ent.second.hostname == hostname) {
+            return ent.second.MAC;
+        }
+    }
+    return "";
 }
