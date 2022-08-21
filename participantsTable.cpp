@@ -44,6 +44,7 @@ void participantsTable::deleteParticipant(const string &IPaddress) {
 }
 
 void participantsTable::printTable() {
+    //system("clear");
     cout << std::left;
     cout << "--------------------------------------------------------------------------\n";
     cout << "|Hostname \t|MAC Address      |IP Address     |Status|\n";

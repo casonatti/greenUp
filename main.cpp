@@ -84,10 +84,7 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
 
             ret_value = sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0,
                                (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
-            if (ret_value < 0) {
-                cout << "Sendto error.";
-                exit(0);
-            }
+            exit(0);
         }
     }
 }
@@ -140,10 +137,6 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             cout << "Recvfrom error.";
             exit(0);
         }
-        pthread_mutex_lock(&mtx);
-        //cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
-        cout << "Ouvi broadcast, vou enviar meu payload\n";
-        pthread_mutex_unlock(&mtx);
 
         if (!g_has_manager) {
             g_serv_addr = manager_addr;
@@ -160,9 +153,6 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
-        pthread_mutex_lock(&mtx);
-        cout << pack->payload << endl;
-        pthread_mutex_unlock(&mtx);
         pack->type = TYPE_DISCOVERY;
         pack->length = strlen(pack->payload);
 
@@ -235,10 +225,6 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
             cout << "Sendto error." << endl;
             exit(0);
         }
-        pthread_mutex_lock(&mtx);
-        cout << "Enviei Discovery para todos\n";
-        pthread_mutex_unlock(&mtx);
-
 
         /*// wake on lan test
 
@@ -405,9 +391,6 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
     }
 
     while (true) {
-        pthread_mutex_lock(&mtx);
-        cout << "esperando no monitor" << endl;
-        pthread_mutex_unlock(&mtx);
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
         if (ret_value < 0) {
@@ -426,9 +409,6 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             cout << "Sendto error.";
             exit(0);
         }
-        pthread_mutex_lock(&mtx);
-        cout << "respondi ao monitor\n";
-        pthread_mutex_unlock(&mtx);
     }
 }
 
@@ -511,9 +491,6 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
             ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                                  (struct sockaddr *) &p_address, &p_address_len);
             if (ret_value < 0) {
-                pthread_mutex_lock(&mtx);
-                cout << "recebi do " << *it << endl;
-                pthread_mutex_unlock(&mtx);
                 pthread_mutex_lock(&mtable);
                 table.sleepParticipant(*it);
                 pthread_mutex_unlock(&mtable);
