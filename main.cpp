@@ -316,13 +316,19 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
         }
 
         if (!strcmp(pack->payload, "EXIT")) {
+            pthread_mutex_lock(&mtable);
             table.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
+            pthread_mutex_unlock(&mtable);
         } else {
             participant p = parsePayload(pack->payload);
+            pthread_mutex_lock(&mtable);
             table.addParticipant(p);
+            pthread_mutex_unlock(&mtable);
         }
         pthread_mutex_lock(&mtx);
+        pthread_mutex_lock(&mtable);
         table.printTable();
+        pthread_mutex_unlock(&mtable);
         pthread_mutex_unlock(&mtx);
     }
 }
@@ -484,7 +490,9 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
 
     // loop responsible for broadcasting monitoring packets
     while (true) {
+        pthread_mutex_lock(&mtable);
         list<string> listIP = table.getAllParticipantsIP();
+        pthread_mutex_unlock(&mtable);
         list<string>::iterator it;
         for (it = listIP.begin(); it != listIP.end(); ++it) {
             pack->type = TYPE_MONITORING;
@@ -506,13 +514,19 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
                 pthread_mutex_lock(&mtx);
                 cout << "recebi do " << *it << endl;
                 pthread_mutex_unlock(&mtx);
+                pthread_mutex_lock(&mtable);
                 table.sleepParticipant(*it);
+                pthread_mutex_unlock(&mtable);
             } else {
+                pthread_mutex_lock(&mtable);
                 table.wakeParticipant(*it);
+                pthread_mutex_unlock(&mtable);
             }
         }
         pthread_mutex_lock(&mtx);
+        pthread_mutex_lock(&mtable);
         table.printTable();
+        pthread_mutex_unlock(&mtable);
         pthread_mutex_unlock(&mtx);
         sleep(5);
     }

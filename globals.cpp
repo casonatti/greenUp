@@ -34,4 +34,5 @@ struct sockaddr_in g_serv_addr{};
 struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
 string my_hostname, my_mac_addr, my_ip_addr;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mtable = PTHREAD_MUTEX_INITIALIZER;
 participantsTable table;
