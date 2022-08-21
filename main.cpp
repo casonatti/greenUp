@@ -141,14 +141,15 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             exit(0);
         }
         pthread_mutex_lock(&mtx);
-        cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
+        //cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
+        cout << "Ouvi broadcast, vou enviar meu payload\n";
         pthread_mutex_unlock(&mtx);
 
         g_serv_addr = manager_addr;
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
-        cout << pack->payload;
+        cout << pack->payload << endl;
         pack->type = TYPE_DISCOVERY;
         pack->length = strlen(pack->payload);
 
@@ -222,7 +223,7 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
             cout << "Sendto error." << endl;
             exit(0);
         }
-        cout << "Enviei Discovery \n";
+        cout << "Enviei Discovery para todos\n";
 
 
         /*// wake on lan test
@@ -239,7 +240,7 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
             exit(0);
         }*/
 
-        sleep(5);
+        sleep(30);
     }
 }
 
@@ -299,8 +300,9 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             cout << "Recvfrom error.";
             exit(0);
         }
-        cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] payload: " << pack->payload;
-        cout << ++banana << endl;
+        //cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] payload: " << pack->payload;
+        //cout << ++banana << endl;
+        cout << "recebi do " << inet_ntoa(participant_addr.sin_addr) << endl;
 
         // TODO: logica para o banco de clients
         if(!strcmp(pack->payload, "EXIT")){
@@ -393,10 +395,12 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
         }
 
         pthread_mutex_lock(&mtx);
-        cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
+        //cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
+        cout << "Ouvi o monitor\n";
         pthread_mutex_unlock(&mtx);
+        cout << "Ouvi o monitor\n";
 
-        string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
+        string s_payload = "estou acordado";
         strcpy(pack->payload, s_payload.data());
         pack->type = TYPE_MONITORING;
         pack->length = strlen(pack->payload);
@@ -406,6 +410,7 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             cout << "Sendto error.";
             exit(0);
         }
+        cout << "respondi o monitor\n";
     }
 }
 
@@ -458,17 +463,27 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
 
     // loop responsible for broadcasting monitoring packets
     while (true) {
-        table.printTable();
-        pack->type = TYPE_MONITORING;
-        pack->seqn = seqn++;
-        strcpy(pack->payload, SLEEP_STATUS_REQUEST);
-        pack->length = strlen(pack->payload);
+        list<string> listIP = table.getAllParticipantsIP();
+        list<string>::iterator it;
+        for (it = listIP.begin(); it != listIP.end(); ++it){
+            struct sockaddr_in pAdress;
+            pAdress.sin_family = AF_INET;
+            pAdress.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_LISTENER);
+            const char *IPchar = it->c_str();
+            inet_aton(IPchar, (in_addr*)&pAdress.sin_addr.s_addr);
 
-        ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                           (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
-        if (ret_value < 0) {
-            cout << "Sendto error." << endl;
-            exit(0);
+            pack->type = TYPE_MONITORING;
+            pack->seqn = seqn++;
+            strcpy(pack->payload, SLEEP_STATUS_REQUEST);
+            pack->length = strlen(pack->payload);
+
+            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                            (struct sockaddr *) &pAdress, sizeof pAdress);
+            if (ret_value < 0) {
+                cout << "Sendto error." << endl;
+                exit(0);
+            }
+            cout << "enviei para " << IPchar << endl; 
         }
 //            table.sleepTable();
 //            cout << "printando tabela sleep \n";
@@ -536,8 +551,9 @@ static void *thr_manager_monitoring_listener(__attribute__((unused)) void *arg) 
         }
 
         pthread_mutex_lock(&mtx);
-        cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
-        cout << ++banana << endl;
+        //cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
+        //cout << ++banana << endl;
+        cout << "o " << inet_ntoa(participant_addr.sin_addr) << "me respondeu" << pack->payload << endl;
         pthread_mutex_unlock(&mtx);
 
         // TODO: logica para o banco de clients

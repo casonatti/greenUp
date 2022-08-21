@@ -1,11 +1,12 @@
 #include <iostream>
 #include <cstring>
 #include <map>
+#include <list>
 using namespace std;
 
 struct participant {
     string hostname;       // Participant hostname
-    string MAC;            // Participant MAC address
+    string MAC;           // Participant MAC address
     string IP;             // Participant IP address
     string status;         // Participant Status
 };
@@ -22,6 +23,7 @@ class participantsTable{
         void printTable();
         bool isAwake(string IPaddress);
         void sleepTable();
+        std::list<string> getAllParticipantsIP();
 };
 
 void participantsTable::updateTable(participant p){
@@ -64,4 +66,13 @@ void participantsTable::sleepTable(){
         cout << ent.second.hostname;
         cout << ent.second.IP;
     }
+}
+
+std::list<string> participantsTable::getAllParticipantsIP(){
+    std::list<string> listP = {};
+    std::list<string>::iterator it = listP.begin();
+    for(auto &ent : table){
+        listP.insert(it, ent.second.IP);
+    }
+    return listP;
 }
