@@ -23,7 +23,7 @@ class participantsTable{
         void deleteParticipant(string IPaddress);
         void printTable();
         bool isAwake(string IPaddress);
-        void sleepTable();
+        void sleepParticipant(string IPaddress);
         std::list<string> getAllParticipantsIP();
 };
 
@@ -61,13 +61,9 @@ bool participantsTable::isAwake(string IPaddress){
     return false;
 }
 
-void participantsTable::sleepTable(){
-    cout << table.size();
-    for(auto &ent : table){
-        ent.second.status = "asleep";
-        cout << ent.second.hostname;
-        cout << ent.second.IP;
-    }
+void participantsTable::sleepParticipant(string IPAddress){
+    table.at(IPAddress).status = "asleep";
+    return;
 }
 
 std::list<string> participantsTable::getAllParticipantsIP(){

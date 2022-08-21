@@ -426,6 +426,15 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
         exit(0);
     }
 
+    //set timeout for socket
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+
+    ret_value = setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_RCVTIMEO] error." << endl;
+        exit(0);
+    }
     // set socket options broadcast and reuseaddr to true
     ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag,
                            sizeof(true_flag));
@@ -482,15 +491,27 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
                 cout << "Sendto error." << endl;
                 exit(0);
             }
-            cout << "enviei para " << IPchar << endl; 
-        }
+            cout << "enviei para " << IPchar << endl;
+
+            ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
+                                  (struct sockaddr *) &pAdress, (socklen_t*)sizeof(sockaddr_in));
+            if (ret_value == -1){
+                table.sleepParticipant((string)it->c_str());
+            }
+            /*if (ret_value < 0) {
+                cout << "Recvfrom error.";
+                exit(0);
+            }*/   
+            
+        } 
+        sleep(5);
+    }
 //            table.sleepTable();
 //            cout << "printando tabela sleep \n";
 //            table.printTable();
 
-        sleep(5);
-    }
 }
+
 
 static void *thr_manager_monitoring_listener(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
@@ -608,7 +629,7 @@ static void participant_function() {
     cout << "My hostname = " << my_hostname << endl << endl;
 
     cout << "Getting my MAC address..." << endl;
-    FILE *file = fopen("/sys/class/net/enp0s3/address",
+    FILE *file = fopen("/sys/class/net/wlo1/address",
                        "r");  // TODO: colocar o nome da interface de rede (ou o nome certo do diretorio)
     i = 0;
     char c_my_mac_addr[16];
@@ -627,7 +648,7 @@ static void participant_function() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
