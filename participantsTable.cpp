@@ -7,7 +7,7 @@ struct participant {
     string hostname;       // Participant hostname
     string MAC;            // Participant MAC address
     string IP;             // Participant IP address
-    string status;               // Participant Status
+    string status;         // Participant Status
 };
 
 class participantsTable{
@@ -37,17 +37,15 @@ void participantsTable::deleteParticipant(string IPaddress){
 
 
 void participantsTable::printTable(){
-    cout << "---------------------------------------------------------\n";
-    cout << table.size() << endl;
-    cout << "|Hostname\t|MAC Address\t|IP Address\t|Status\t|\n";
+    cout << "--------------------------------------------------------------------------\n";
+    cout << "|Hostname\t|MAC Address\t\t|IP Address\t\t|Status\t|\n";
     for(auto &ent : table){
         cout << "|" << ent.second.hostname << "\t";
         cout << "|" << ent.second.MAC << "\t";
-        cout << "|" << ent.second.IP << "\t";
+        cout << "|" << ent.second.IP << "\t\t";
         cout << "|" << ent.second.status << "\t|\n";
     }
-    cout << "---------------------------------------------------------\n";
-    cout << table.size() << endl;
+    cout << "----------------------------------------------------------\n";
     return;
 }
 
@@ -60,7 +58,6 @@ bool participantsTable::isAwake(string IPaddress){
 }
 
 void participantsTable::sleepTable(){
-    cout << "entrei no sleepTable\n";
     cout << table.size();
     for(auto &ent : table){
         ent.second.status = "asleep";

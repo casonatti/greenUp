@@ -1,6 +1,6 @@
 #include <netinet/in.h>
 #include <cstdlib> // exit() precisa desse include nos labs do inf
-//#include "participantsTable.cpp"
+#include "participantsTable.cpp"
 
 // -------------------------------------------------- CONSTANTS --------------------------------------------------------
 
@@ -35,3 +35,4 @@ struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
 string my_hostname, my_mac_addr, my_ip_addr;
 int banana = 0;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+participantsTable table;

@@ -31,33 +31,33 @@ void signalHandler(int signum) {
     exit(signum);
 }
 
-//participant parsePayload(string payLoad){
-//    std::string s;
-//    std::string delimiter = ", ";
-//    participant p;
-//    int i = 0;
-//
-//    s = payLoad;
-//    size_t pos = 0;
-//    std::string token;
-//    while ((pos = s.find(delimiter)) != std::string::npos) {
-//        token = s.substr(0, pos);
-//        std::cout << token << std::endl;
-//        switch (i)
-//        {
-//        case 0:
-//            p.hostname = token;
-//            break;
-//        case 1:
-//            p.MAC = token;
-//            break;
-//        }
-//        s.erase(0, pos + delimiter.length());
-//        i++;
-//    }
-//    p.IP = s;
-//    return p;
-//}
+participant parsePayload(string payLoad){
+    std::string s;
+    std::string delimiter = ", ";
+    participant p;
+    int i = 0;
+
+    s = payLoad;
+    size_t pos = 0;
+    std::string token;
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token = s.substr(0, pos);
+        std::cout << token << std::endl;
+        switch (i)
+        {
+        case 0:
+            p.hostname = token;
+            break;
+        case 1:
+            p.MAC = token;
+            break;
+        }
+        s.erase(0, pos + delimiter.length());
+        i++;
+    }
+    p.IP = s;
+    return p;
+}
 
 static void *thr_participant_interface_service(__attribute__((unused)) void *arg) {
     char buffer[32];
@@ -148,7 +148,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
-//        cout << pack->payload;
+        cout << pack->payload;
         pack->type = TYPE_DISCOVERY;
         pack->length = strlen(pack->payload);
 
@@ -222,12 +222,11 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
             cout << "Sendto error." << endl;
             exit(0);
         }
+        cout << "Enviei Discovery \n";
 
-//        table.sleepTable();
-//        cout << "printando tabela sleep \n";
-//        table.printTable();
 
-        // wake on lan test
+        /*// wake on lan test
+
         string message = "\xFF\xFF\xFF\xFF\xFF\xFF";
         string mac_addr = "\xAB\xCD\xEF\x01\x23\x45";
         for (int i = 16; i > 0; i--) {
@@ -238,7 +237,7 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
         if (ret_value < 0) {
             cout << "Sendto error." << endl;
             exit(0);
-        }
+        }*/
 
         sleep(5);
     }
@@ -300,15 +299,17 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             cout << "Recvfrom error.";
             exit(0);
         }
-        pthread_mutex_lock(&mtx);
-        cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
+        cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] payload: " << pack->payload;
         cout << ++banana << endl;
-        pthread_mutex_unlock(&mtx);
 
         // TODO: logica para o banco de clients
-//        participant p = parsePayload(pack->payload);
-//        table.updateTable(p);
-//        table.printTable();
+        if(!strcmp(pack->payload, "EXIT")){
+            table.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
+        } else{
+            participant p = parsePayload(pack->payload);
+            table.updateTable(p);
+        }   
+        table.printTable();
     }
 }
 
@@ -457,6 +458,7 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
 
     // loop responsible for broadcasting monitoring packets
     while (true) {
+        table.printTable();
         pack->type = TYPE_MONITORING;
         pack->seqn = seqn++;
         strcpy(pack->payload, SLEEP_STATUS_REQUEST);
@@ -594,9 +596,10 @@ static void participant_function() {
     FILE *file = fopen("/sys/class/net/wlo1/address",
                        "r");  // TODO: colocar o nome da interface de rede (ou o nome certo do diretorio)
     i = 0;
-    char c_my_mac_addr[17];
+    char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1){
-        my_mac_addr += c_my_mac_addr[i];
+        if(c_my_mac_addr[i] != '\n')
+            my_mac_addr += c_my_mac_addr[i];
         i++;
     }
     cout << "My MAC address = " << my_mac_addr << endl << endl;
