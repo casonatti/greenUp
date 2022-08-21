@@ -31,7 +31,7 @@ struct packet {
 int g_sockfd, g_seqn = 1;
 struct sockaddr_in g_serv_addr{};
 struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
-//participantsTable table;
+participantsTable table;
 string my_hostname, my_mac_addr, my_ip_addr;
 int banana = 0;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;

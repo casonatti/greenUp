@@ -38,17 +38,17 @@ void participantsTable::deleteParticipant(string IPaddress){
 
 void participantsTable::printTable(){
     cout << "---------------------------------------------------------\n";
-    cout << table.size() << endl;
-    cout << "|Hostname\t|MAC Address\t|IP Address\t|Status\t|\n";
+    //cout << table.size() << endl;
+    cout << "|Hostname\t|MAC Address\t\t|IP Address\t\t|Status\t|\n";
     for(auto &ent : table){
         cout << "|" << ent.second.hostname << "\t";
-        cout << "|" << ent.second.MAC << "\t";
-        cout << "|" << ent.second.IP << "\t";
+        cout << "|" << ent.second.MAC << "\t\t";
+        cout << "|" << ent.second.IP << "\t\t";
         cout << "|" << ent.second.status << "\t|\n";
     }
     cout << "---------------------------------------------------------\n";
-    cout << table.size() << endl;
-    return;
+    //cout << table.size() << endl;
+    //return;
 }
 
 bool participantsTable::isAwake(string IPaddress){

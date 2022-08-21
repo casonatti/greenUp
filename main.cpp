@@ -4,6 +4,7 @@
 #include <cstring>
 #include <pthread.h>
 #include <cstdio>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -11,6 +12,7 @@
 #include <unistd.h>
 #include <cstdlib> // exit() precisa desse include nos labs do inf
 #include <mutex>
+#include "participantsTable.cpp"
 
 using namespace std;
 
@@ -31,33 +33,33 @@ void signalHandler(int signum) {
     exit(signum);
 }
 
-//participant parsePayload(string payLoad){
-//    std::string s;
-//    std::string delimiter = ", ";
-//    participant p;
-//    int i = 0;
-//
-//    s = payLoad;
-//    size_t pos = 0;
-//    std::string token;
-//    while ((pos = s.find(delimiter)) != std::string::npos) {
-//        token = s.substr(0, pos);
-//        std::cout << token << std::endl;
-//        switch (i)
-//        {
-//        case 0:
-//            p.hostname = token;
-//            break;
-//        case 1:
-//            p.MAC = token;
-//            break;
-//        }
-//        s.erase(0, pos + delimiter.length());
-//        i++;
-//    }
-//    p.IP = s;
-//    return p;
-//}
+participant parsePayload(string payLoad){
+    participant p;
+    std::string s;
+    std::string delimiter = ", ";
+    int i = 0;
+
+    s = payLoad;
+    size_t pos = 0;
+    std::string token;
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token = s.substr(0, pos);
+        //std::cout << token << std::endl;
+        switch (i)
+        {
+        case 0:
+            p.hostname = token;
+            break;
+        case 1:
+            p.MAC = token;
+            break;
+        }
+        s.erase(0, pos + delimiter.length());
+        i++;
+    }
+    p.IP = s;
+    return p;
+}
 
 static void *thr_participant_interface_service(__attribute__((unused)) void *arg) {
     char buffer[32];
@@ -79,7 +81,7 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
             pack->type = TYPE_EXIT;
             strcpy(pack->payload, "EXIT");
             pack->length = strlen(pack->payload);
-            pack->seqn = 0;
+            pack->seqn = 0; //TODO: melhorar isso
 
             ret_value = sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0,
                            (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
@@ -292,6 +294,7 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
 
     // ------------------------------------------- DISCOVERY LISTENER --------------------------------------------------
 
+    participant p;
     // loop responsible for receiving answers to broadcasted discovery packets
     while (true) {
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
@@ -300,15 +303,23 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             cout << "Recvfrom error.";
             exit(0);
         }
-        pthread_mutex_lock(&mtx);
-        cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
-        cout << ++banana << endl;
-        pthread_mutex_unlock(&mtx);
+        //pthread_mutex_lock(&mtx);
+        //cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
+        //cout << ++banana << endl;
+        //pthread_mutex_unlock(&mtx);
 
-        // TODO: logica para o banco de clients
-//        participant p = parsePayload(pack->payload);
-//        table.updateTable(p);
-//        table.printTable();
+        // TODO: logica para o banco de clients (TO AQUI!)
+        if(pack->type != TYPE_EXIT) {
+            p = parsePayload(pack->payload);
+            table.updateTable(p);
+            system("clear");
+            table.printTable();
+        } else {
+            p.IP = pack->payload;
+            table.deleteParticipant(p.IP);
+            system("clear");
+            table.printTable();
+        }
     }
 }
 
@@ -391,9 +402,9 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             exit(0);
         }
 
-        pthread_mutex_lock(&mtx);
-        cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
-        pthread_mutex_unlock(&mtx);
+        //pthread_mutex_lock(&mtx);
+        //cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
+        //pthread_mutex_unlock(&mtx);
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
@@ -533,10 +544,10 @@ static void *thr_manager_monitoring_listener(__attribute__((unused)) void *arg) 
             exit(0);
         }
 
-        pthread_mutex_lock(&mtx);
-        cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
-        cout << ++banana << endl;
-        pthread_mutex_unlock(&mtx);
+        //pthread_mutex_lock(&mtx);
+        //cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
+        //cout << ++banana << endl;
+        //pthread_mutex_unlock(&mtx);
 
         // TODO: logica para o banco de clients
 //            participant p = parsePayload(pack->payload);
