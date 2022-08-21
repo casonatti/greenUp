@@ -21,13 +21,11 @@ public:
 
     std::map<string, participant> table;
 
-    void updateTable(participant p);
+    void addParticipant(participant p);
 
     void deleteParticipant(const string &IPaddress);
 
     void printTable();
-
-    bool isAwake(const string &IPaddress);
 
     void sleepParticipant(const string &IPaddress);
 
@@ -36,7 +34,7 @@ public:
     std::list<string> getAllParticipantsIP();
 };
 
-void participantsTable::updateTable(participant p) {
+void participantsTable::addParticipant(participant p) {
     p.status = "awake";
     table.insert_or_assign(p.IP, p);
 }
@@ -55,15 +53,7 @@ void participantsTable::printTable() {
         cout << "|" << setw(15) << ent.second.IP;
         cout << "|" << setw(6) << ent.second.status << "|\n";
     }
-    cout << "----------------------------------------------------------\n";
-}
-
-bool participantsTable::isAwake(const string &IPaddress) {
-    if (table.count(IPaddress)) {
-        participant p = table.at(IPaddress);
-        return p.status == "awake";
-    }
-    return false;
+    cout << "--------------------------------------------------------------------------\n";
 }
 
 void participantsTable::sleepParticipant(const string &IPAddress) {

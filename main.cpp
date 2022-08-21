@@ -42,7 +42,6 @@ participant parsePayload(string payLoad) {
     std::string token;
     while ((pos = s.find(delimiter)) != std::string::npos) {
         token = s.substr(0, pos);
-        std::cout << token << std::endl;
         switch (i) {
             case 0:
                 p.hostname = token;
@@ -75,7 +74,9 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
     while (true) {
         cin.getline(buffer, 32);
         if (strcmp(buffer, "EXIT") == 0) {
+            pthread_mutex_lock(&mtx);
             cout << "Sending command EXIT..." << endl;
+            pthread_mutex_unlock(&mtx);
             pack->type = TYPE_EXIT;
             strcpy(pack->payload, "EXIT");
             pack->length = strlen(pack->payload);
@@ -146,19 +147,22 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
 
         if (!g_has_manager) {
             g_serv_addr = manager_addr;
+            pthread_mutex_lock(&mtx);
             cout << "----------------------------------------------------------\n";
             cout << "|Hostname\t|MAC Address\t\t|IP Address\n";
             cout << "|" << "m. hostname" << "\t";
             cout << "|" << "m. mac address" << "\t\t";
             cout << "|" << inet_ntoa(g_serv_addr.sin_addr) << "\n";
             cout << "----------------------------------------------------------\n";
-
+            pthread_mutex_unlock(&mtx);
             g_has_manager = true;
         }
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
+        pthread_mutex_lock(&mtx);
         cout << pack->payload << endl;
+        pthread_mutex_unlock(&mtx);
         pack->type = TYPE_DISCOVERY;
         pack->length = strlen(pack->payload);
 
@@ -231,7 +235,9 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
             cout << "Sendto error." << endl;
             exit(0);
         }
+        pthread_mutex_lock(&mtx);
         cout << "Enviei Discovery para todos\n";
+        pthread_mutex_unlock(&mtx);
 
 
         /*// wake on lan test
@@ -313,9 +319,11 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             table.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
         } else {
             participant p = parsePayload(pack->payload);
-            table.updateTable(p);
+            table.addParticipant(p);
         }
+        pthread_mutex_lock(&mtx);
         table.printTable();
+        pthread_mutex_unlock(&mtx);
     }
 }
 
@@ -391,7 +399,9 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
     }
 
     while (true) {
+        pthread_mutex_lock(&mtx);
         cout << "esperando no monitor" << endl;
+        pthread_mutex_unlock(&mtx);
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
         if (ret_value < 0) {
@@ -410,7 +420,9 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             cout << "Sendto error.";
             exit(0);
         }
+        pthread_mutex_lock(&mtx);
         cout << "respondi ao monitor\n";
+        pthread_mutex_unlock(&mtx);
     }
 }
 
@@ -491,13 +503,17 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
             ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                                  (struct sockaddr *) &p_address, &p_address_len);
             if (ret_value < 0) {
+                pthread_mutex_lock(&mtx);
                 cout << "recebi do " << *it << endl;
+                pthread_mutex_unlock(&mtx);
                 table.sleepParticipant(*it);
             } else {
                 table.wakeParticipant(*it);
             }
         }
+        pthread_mutex_lock(&mtx);
         table.printTable();
+        pthread_mutex_unlock(&mtx);
         sleep(5);
     }
 }
@@ -508,17 +524,20 @@ static void participant_function() {
     const char *status;
     struct sockaddr_in *teste;
     struct ifaddrs *ifap, *ifa;
-
+    pthread_mutex_lock(&mtx);
     cout << "========= Configurando o Participante =========" << endl;
 
     cout << "Getting my hostname..." << endl;
+    pthread_mutex_unlock(&mtx);
     char c_my_hostname[32];
     gethostname(c_my_hostname, 32);
     my_hostname = c_my_hostname;
+    pthread_mutex_lock(&mtx);
     cout << "My hostname = " << my_hostname << endl << endl;
 
     cout << "Getting my MAC address..." << endl;
-    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
+    pthread_mutex_unlock(&mtx);
+    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -526,28 +545,29 @@ static void participant_function() {
             my_mac_addr += c_my_mac_addr[i];
         i++;
     }
+    pthread_mutex_lock(&mtx);
     cout << "My MAC address = " << my_mac_addr << endl << endl;
     fclose(file);
 
     cout << "Getting my IP address..." << endl;
+    pthread_mutex_unlock(&mtx);
     //participant = gethostbyname(my_hostname);
     //my_ip_addr = inet_ntoa(*((struct in_addr*) participant->h_addr_list[0]));
     getifaddrs(&ifap);
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
         }
     }
+    pthread_mutex_lock(&mtx);
     cout << "My IP address = " << my_ip_addr << endl << endl;
 
-    status = "awaken";
-    cout << "Status = " << status << endl;
-
     cout << "===============================================" << endl << endl;
+    pthread_mutex_unlock(&mtx);
 
     // ---------------------------------------------- SUBSERVICES ------------------------------------------------------
 
