@@ -3,6 +3,7 @@
 #include <map>
 #include <list>
 #include <iomanip>
+
 using namespace std;
 
 struct participant {
@@ -12,64 +13,71 @@ struct participant {
     string status;         // Participant Status
 };
 
-class participantsTable{
-    public:
-        participantsTable(){
-            table;
-        }
-        std::map<string, participant> table;
-        
-        void updateTable(participant p);
-        void deleteParticipant(string IPaddress);
-        void printTable();
-        bool isAwake(string IPaddress);
-        void sleepParticipant(string IPaddress);
-        std::list<string> getAllParticipantsIP();
+class participantsTable {
+public:
+    participantsTable() {
+        table;
+    }
+
+    std::map<string, participant> table;
+
+    void updateTable(participant p);
+
+    void deleteParticipant(const string &IPaddress);
+
+    void printTable();
+
+    bool isAwake(const string &IPaddress);
+
+    void sleepParticipant(const string &IPaddress);
+
+    void wakeParticipant(const string &IPAddress);
+
+    std::list<string> getAllParticipantsIP();
 };
 
-void participantsTable::updateTable(participant p){
+void participantsTable::updateTable(participant p) {
     p.status = "awake";
     table.insert_or_assign(p.IP, p);
-    return;
 }
 
-void participantsTable::deleteParticipant(string IPaddress){
+void participantsTable::deleteParticipant(const string &IPaddress) {
     table.erase(IPaddress);
-    return;
 }
 
-
-void participantsTable::printTable(){
+void participantsTable::printTable() {
     cout << std::left;
     cout << "--------------------------------------------------------------------------\n";
     cout << "|Hostname \t|MAC Address      |IP Address     |Status|\n";
-    for(auto &ent : table){
+    for (auto &ent: table) {
         cout << "|" << setw(15) << ent.second.hostname;
         cout << "|" << ent.second.MAC;
         cout << "|" << setw(15) << ent.second.IP;
         cout << "|" << setw(6) << ent.second.status << "|\n";
     }
     cout << "----------------------------------------------------------\n";
-    return;
 }
 
-bool participantsTable::isAwake(string IPaddress){
-    if(table.count(IPaddress)){
+bool participantsTable::isAwake(const string &IPaddress) {
+    if (table.count(IPaddress)) {
         participant p = table.at(IPaddress);
         return p.status == "awake";
     }
     return false;
 }
 
-void participantsTable::sleepParticipant(string IPAddress){
+void participantsTable::sleepParticipant(const string &IPAddress) {
     table.at(IPAddress).status = "asleep";
-    return;
 }
 
-std::list<string> participantsTable::getAllParticipantsIP(){
+void participantsTable::wakeParticipant(const string &IPAddress) {
+    table.at(IPAddress).status = "awake";
+}
+
+std::list<string> participantsTable::getAllParticipantsIP() {
     std::list<string> listP = {};
-    std::list<string>::iterator it = listP.begin();
-    for(auto &ent : table){
+    auto it = listP.begin();
+    for (auto &ent: table) {
         listP.insert(it, ent.second.IP);
     }
     return listP;

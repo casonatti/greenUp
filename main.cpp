@@ -31,7 +31,7 @@ void signalHandler(int signum) {
     exit(signum);
 }
 
-participant parsePayload(string payLoad){
+participant parsePayload(string payLoad) {
     std::string s;
     std::string delimiter = ", ";
     participant p;
@@ -43,14 +43,15 @@ participant parsePayload(string payLoad){
     while ((pos = s.find(delimiter)) != std::string::npos) {
         token = s.substr(0, pos);
         std::cout << token << std::endl;
-        switch (i)
-        {
-        case 0:
-            p.hostname = token;
-            break;
-        case 1:
-            p.MAC = token;
-            break;
+        switch (i) {
+            case 0:
+                p.hostname = token;
+                break;
+            case 1:
+                p.MAC = token;
+                break;
+            default:
+                break;
         }
         s.erase(0, pos + delimiter.length());
         i++;
@@ -61,7 +62,6 @@ participant parsePayload(string payLoad){
 
 static void *thr_participant_interface_service(__attribute__((unused)) void *arg) {
     char buffer[32];
-    int true_flag = true;
     ssize_t ret_value;
     auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
@@ -72,9 +72,9 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
         exit(0);
     }
 
-    while(true) {
+    while (true) {
         cin.getline(buffer, 32);
-        if(strcmp(buffer, "EXIT") == 0) {
+        if (strcmp(buffer, "EXIT") == 0) {
             cout << "Sending command EXIT..." << endl;
             pack->type = TYPE_EXIT;
             strcpy(pack->payload, "EXIT");
@@ -82,7 +82,7 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
             pack->seqn = 0;
 
             ret_value = sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0,
-                           (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
+                               (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
             if (ret_value < 0) {
                 cout << "Sendto error.";
                 exit(0);
@@ -144,7 +144,17 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
         cout << "Ouvi broadcast, vou enviar meu payload\n";
         pthread_mutex_unlock(&mtx);
 
-        g_serv_addr = manager_addr;
+        if (!g_has_manager) {
+            g_serv_addr = manager_addr;
+            cout << "----------------------------------------------------------\n";
+            cout << "|Hostname\t|MAC Address\t\t|IP Address\n";
+            cout << "|" << "m. hostname" << "\t";
+            cout << "|" << "m. mac address" << "\t\t";
+            cout << "|" << inet_ntoa(g_serv_addr.sin_addr) << "\n";
+            cout << "----------------------------------------------------------\n";
+
+            g_has_manager = true;
+        }
 
         string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
         strcpy(pack->payload, s_payload.data());
@@ -164,7 +174,6 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
 static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg) {
     int sockfd, seqn = 1, true_flag = true;
     ssize_t ret_value;
-    socklen_t participant_len = sizeof(struct sockaddr_in);
     struct sockaddr_in manager_addr{}, broadcast_addr{};
     auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
@@ -217,7 +226,7 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
         pack->length = strlen(pack->payload);
 
         ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                           (struct sockaddr *) &broadcast_addr,sizeof broadcast_addr);
+                           (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
         if (ret_value < 0) {
             cout << "Sendto error." << endl;
             exit(0);
@@ -239,12 +248,12 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
             exit(0);
         }*/
 
-        sleep(30);
+        sleep(8);
     }
 }
 
 static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
-    int sockfd, seqn = 1, true_flag = true;
+    int sockfd, true_flag = true;
     ssize_t ret_value;
     socklen_t participant_len = sizeof(struct sockaddr_in);
     struct sockaddr_in manager_addr{}, broadcast_addr{}, participant_addr{};
@@ -299,17 +308,13 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             cout << "Recvfrom error.";
             exit(0);
         }
-        //cout << "[D] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] payload: " << pack->payload;
-        //cout << ++banana << endl;
-        cout << "recebi do " << inet_ntoa(participant_addr.sin_addr) << endl;
 
-        // TODO: logica para o banco de clients
-        if(!strcmp(pack->payload, "EXIT")){
+        if (!strcmp(pack->payload, "EXIT")) {
             table.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
-        } else{
+        } else {
             participant p = parsePayload(pack->payload);
             table.updateTable(p);
-        }   
+        }
         table.printTable();
     }
 }
@@ -386,7 +391,7 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
     }
 
     while (true) {
-        cout << "entrei no servico de monitoramento\n";
+        cout << "esperando no monitor" << endl;
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
         if (ret_value < 0) {
@@ -394,29 +399,26 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             exit(0);
         }
 
-        pthread_mutex_lock(&mtx);
-        //cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
-        cout << "ouvi o monitor\n";
-        pthread_mutex_unlock(&mtx);
-
         string s_payload = "estou acordado";
         strcpy(pack->payload, s_payload.data());
         pack->type = TYPE_MONITORING;
         pack->length = strlen(pack->payload);
+
         ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
                            (struct sockaddr *) &manager_addr, sizeof manager_addr);
         if (ret_value < 0) {
             cout << "Sendto error.";
             exit(0);
         }
-        cout << "respondi o monitor\n";
+        cout << "respondi ao monitor\n";
     }
 }
 
-static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *arg) {
+static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
     int sockfd, seqn = 1, true_flag = true;
     ssize_t ret_value;
-    struct sockaddr_in manager_addr{}, broadcast_addr{};
+    struct sockaddr_in manager_addr{}, p_address{};
+    socklen_t p_address_len = sizeof(struct sockaddr_in);
     auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
     // creates manager's monitoring socket
@@ -426,15 +428,15 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
         exit(0);
     }
 
-    //set timeout for socket
-    struct timeval timeout;
-    timeout.tv_sec = 1;
-
-    ret_value = setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+    // set timeout for socket
+    struct timeval timeout{};
+    timeout.tv_sec = 5;
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
     if (ret_value < 0) {
         cout << "Setsockopt [SO_RCVTIMEO] error." << endl;
         exit(0);
     }
+
     // set socket options broadcast and reuseaddr to true
     ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag,
                            sizeof(true_flag));
@@ -455,10 +457,9 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
     manager_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_LISTENER);
     manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-//    // configure manager's monitoring broadcast address
-//    broadcast_addr.sin_family = AF_INET;
-//    broadcast_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
-//    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    // initial configuration for the participant address
+    p_address.sin_family = AF_INET;
+    p_address.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
 
     // bind the manager's monitoring socket to the listening port
     ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, sizeof(manager_addr));
@@ -473,144 +474,32 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
     while (true) {
         list<string> listIP = table.getAllParticipantsIP();
         list<string>::iterator it;
-        for (it = listIP.begin(); it != listIP.end(); ++it){
-            struct sockaddr_in pAdress{};
-            pAdress.sin_family = AF_INET;
-            pAdress.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
-            const char *IPchar = it->c_str();
-            inet_aton(IPchar, (in_addr*) &pAdress.sin_addr.s_addr);
-
+        for (it = listIP.begin(); it != listIP.end(); ++it) {
             pack->type = TYPE_MONITORING;
             pack->seqn = seqn++;
             strcpy(pack->payload, SLEEP_STATUS_REQUEST);
             pack->length = strlen(pack->payload);
 
+            inet_aton(it->c_str(), (in_addr *) &p_address.sin_addr.s_addr);
             ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                            (struct sockaddr *) &pAdress, sizeof pAdress);
+                               (struct sockaddr *) &p_address, sizeof p_address);
             if (ret_value < 0) {
                 cout << "Sendto error." << endl;
                 exit(0);
             }
-            cout << "enviei para " << IPchar << endl;
 
             ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
-                                  (struct sockaddr *) &pAdress, (socklen_t*)sizeof(sockaddr_in));
-            if (ret_value == -1){
-                table.sleepParticipant((string)it->c_str());
+                                 (struct sockaddr *) &p_address, &p_address_len);
+            if (ret_value < 0) {
+                cout << "recebi do " << *it << endl;
+                table.sleepParticipant(*it);
+            } else {
+                table.wakeParticipant(*it);
             }
-            /*if (ret_value < 0) {
-                cout << "Recvfrom error.";
-                exit(0);
-            }*/   
-            
-        } 
+        }
+        table.printTable();
         sleep(5);
     }
-//            table.sleepTable();
-//            cout << "printando tabela sleep \n";
-//            table.printTable();
-
-}
-
-
-static void *thr_manager_monitoring_listener(__attribute__((unused)) void *arg) {
-    int sockfd, true_flag = true;
-    ssize_t ret_value;
-    socklen_t participant_len = sizeof(struct sockaddr_in);
-    struct sockaddr_in manager_addr{}, broadcast_addr{}, participant_addr{};
-    auto *pack = (struct packet *) malloc(sizeof(struct packet));
-
-    // creates manager's monitoring socket
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        cout << "Socket creation error";
-        exit(0);
-    }
-
-    // set socket options broadcast and reuseaddr to true
-    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag,
-                           sizeof(true_flag));
-    if (ret_value < 0) {
-        cout << "Setsockopt [SO_BROADCAST] error." << endl;
-        exit(0);
-    }
-
-    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &true_flag,
-                           sizeof(true_flag));
-    if (ret_value < 0) {
-        cout << "Setsockopt [SO_REUSEADDR] error." << endl;
-        exit(0);
-    }
-
-    // configure manager's monitoring listening address
-    manager_addr.sin_family = AF_INET;
-    manager_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_LISTENER);
-    manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    // configure manager's monitoring broadcast address
-    broadcast_addr.sin_family = AF_INET;
-    broadcast_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
-    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-
-    // bind the manager's monitoring socket to the listening port
-    ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, sizeof(manager_addr));
-    if (ret_value < 0) {
-        cout << "Bind socket error." << endl;
-        exit(0);
-    }
-
-    // ------------------------------------------ MONITORING LISTENER --------------------------------------------------
-
-    // loop responsible for receiving answers to broadcasted monitoring packets
-    while (true) {
-        ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
-                                  (struct sockaddr *) &participant_addr, &participant_len);
-        if (ret_value < 0) {
-            cout << "Recvfrom error.";
-            exit(0);
-        }
-
-        pthread_mutex_lock(&mtx);
-        //cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(participant_addr.sin_addr) << "] Banana: ";
-        //cout << ++banana << endl;
-        cout << "o " << inet_ntoa(participant_addr.sin_addr) << "me respondeu" << pack->payload << endl;
-        pthread_mutex_unlock(&mtx);
-
-        // TODO: logica para o banco de clients
-//            participant p = parsePayload(pack->payload);
-//            table.updateTable(p);
-//            table.printTable();
-    }
-}
-
-static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
-
-    // ------------------------------------------ MONITORING THREADS ---------------------------------------------------
-
-    ssize_t ret_value;
-    pthread_t thr_broadcaster, thr_listener;
-    pthread_attr_t attr_broadcaster, attr_listener;
-
-    ret_value = pthread_attr_init(&attr_broadcaster);
-    if (ret_value != 0) {
-        cout << "Pthread_attr_init error." << endl;
-        exit(0);
-    }
-    ret_value = pthread_attr_init(&attr_listener);
-    if (ret_value != 0) {
-        cout << "Pthread_attr_init error." << endl;
-        exit(0);
-    }
-
-    pthread_create(&thr_broadcaster, &attr_broadcaster, &thr_manager_monitoring_broadcaster,
-                   nullptr);
-    pthread_create(&thr_listener, &attr_listener, &thr_manager_monitoring_listener,
-                   nullptr);
-
-    pthread_join(thr_broadcaster, nullptr);
-    pthread_join(thr_listener, nullptr);
-
-    exit(0);
 }
 
 static void participant_function() {
@@ -629,12 +518,11 @@ static void participant_function() {
     cout << "My hostname = " << my_hostname << endl << endl;
 
     cout << "Getting my MAC address..." << endl;
-    FILE *file = fopen("/sys/class/net/wlo1/address",
-                       "r");  // TODO: colocar o nome da interface de rede (ou o nome certo do diretorio)
+    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
     i = 0;
     char c_my_mac_addr[16];
-    while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1){
-        if(c_my_mac_addr[i] != '\n')
+    while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
+        if (c_my_mac_addr[i] != '\n')
             my_mac_addr += c_my_mac_addr[i];
         i++;
     }
@@ -648,7 +536,7 @@ static void participant_function() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
+            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
@@ -731,7 +619,6 @@ int main(int argc, char **argv) {
 
 // ----------------------------------------------- PARTICIPANT section -------------------------------------------------
 
-    ssize_t ret_value;
     if (argc == 1) {
         participant_function();
     }

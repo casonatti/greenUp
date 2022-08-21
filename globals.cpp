@@ -29,10 +29,9 @@ struct packet {
 
 // prefixadas com g_ por serem globais e para nao sofrerem shadowing das locais
 int g_sockfd, g_seqn = 1;
+bool g_has_manager = false;
 struct sockaddr_in g_serv_addr{};
 struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
-//participantsTable table;
 string my_hostname, my_mac_addr, my_ip_addr;
-int banana = 0;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 participantsTable table;
