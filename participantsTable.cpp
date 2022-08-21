@@ -2,6 +2,7 @@
 #include <cstring>
 #include <map>
 #include <list>
+#include <iomanip>
 using namespace std;
 
 struct participant {
@@ -39,13 +40,14 @@ void participantsTable::deleteParticipant(string IPaddress){
 
 
 void participantsTable::printTable(){
+    cout << std::left;
     cout << "--------------------------------------------------------------------------\n";
-    cout << "|Hostname\t|MAC Address\t\t|IP Address\t\t|Status\t|\n";
+    cout << "|Hostname \t|MAC Address      |IP Address     |Status|\n";
     for(auto &ent : table){
-        cout << "|" << ent.second.hostname << "\t";
-        cout << "|" << ent.second.MAC << "\t";
-        cout << "|" << ent.second.IP << "\t\t";
-        cout << "|" << ent.second.status << "\t|\n";
+        cout << "|" << setw(15) << ent.second.hostname;
+        cout << "|" << ent.second.MAC;
+        cout << "|" << setw(15) << ent.second.IP;
+        cout << "|" << setw(6) << ent.second.status << "|\n";
     }
     cout << "----------------------------------------------------------\n";
     return;
