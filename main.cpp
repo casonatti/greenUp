@@ -91,7 +91,6 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
     }
 }
 
-
 static void *thr_participant_discovery_service(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
     ssize_t ret_value;
@@ -387,6 +386,7 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
     }
 
     while (true) {
+        cout << "entrei no servico de monitoramento\n";
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
         if (ret_value < 0) {
@@ -396,9 +396,8 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
 
         pthread_mutex_lock(&mtx);
         //cout << "[M] Recebi (x" << pack->seqn << ") [" << inet_ntoa(manager_addr.sin_addr) << "]" << endl;
-        cout << "Ouvi o monitor\n";
+        cout << "ouvi o monitor\n";
         pthread_mutex_unlock(&mtx);
-        cout << "Ouvi o monitor\n";
 
         string s_payload = "estou acordado";
         strcpy(pack->payload, s_payload.data());
@@ -447,10 +446,10 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
     manager_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_LISTENER);
     manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    // configure manager's monitoring broadcast address
-    broadcast_addr.sin_family = AF_INET;
-    broadcast_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
-    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+//    // configure manager's monitoring broadcast address
+//    broadcast_addr.sin_family = AF_INET;
+//    broadcast_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
+//    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
     // bind the manager's monitoring socket to the listening port
     ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, sizeof(manager_addr));
@@ -466,11 +465,11 @@ static void *thr_manager_monitoring_broadcaster(__attribute__((unused)) void *ar
         list<string> listIP = table.getAllParticipantsIP();
         list<string>::iterator it;
         for (it = listIP.begin(); it != listIP.end(); ++it){
-            struct sockaddr_in pAdress;
+            struct sockaddr_in pAdress{};
             pAdress.sin_family = AF_INET;
-            pAdress.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_LISTENER);
+            pAdress.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
             const char *IPchar = it->c_str();
-            inet_aton(IPchar, (in_addr*)&pAdress.sin_addr.s_addr);
+            inet_aton(IPchar, (in_addr*) &pAdress.sin_addr.s_addr);
 
             pack->type = TYPE_MONITORING;
             pack->seqn = seqn++;
@@ -609,7 +608,7 @@ static void participant_function() {
     cout << "My hostname = " << my_hostname << endl << endl;
 
     cout << "Getting my MAC address..." << endl;
-    FILE *file = fopen("/sys/class/net/wlo1/address",
+    FILE *file = fopen("/sys/class/net/enp0s3/address",
                        "r");  // TODO: colocar o nome da interface de rede (ou o nome certo do diretorio)
     i = 0;
     char c_my_mac_addr[16];
@@ -628,7 +627,7 @@ static void participant_function() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
+            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
