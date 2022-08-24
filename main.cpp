@@ -227,7 +227,6 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
         }
 
         if (!g_has_manager) {
-            cout << "Configurando g_serv_addr..." << endl;
             g_serv_addr = manager_addr;
             pthread_mutex_lock(&mtx);
             cout << "----------------------------------------------------------\n";
@@ -392,7 +391,6 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
 
         if (!strcmp(pack->payload, "EXIT")) {
             pthread_mutex_lock(&mtable);
-            cout << "Entrei aqui!" << endl;
             table.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
             pthread_mutex_unlock(&mtable);
         } else {
