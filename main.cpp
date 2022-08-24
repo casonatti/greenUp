@@ -61,12 +61,11 @@ participant parsePayload(string payLoad) {
 
 static void *thr_participant_interface_service(__attribute__((unused)) void *arg) {
     char buffer[32];
-    int sockfd;
     auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
     // creates participant's discovery socket
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
+    g_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (g_sockfd < 0) {
         cout << "Socket creation error";
         exit(0);
     }
@@ -82,7 +81,7 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
             pack->length = strlen(pack->payload);
             pack->seqn = 0;
 
-            sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+            sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0,
                    (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
             exit(0);
         }
@@ -228,6 +227,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
         }
 
         if (!g_has_manager) {
+            cout << "Configurando g_serv_addr..." << endl;
             g_serv_addr = manager_addr;
             pthread_mutex_lock(&mtx);
             cout << "----------------------------------------------------------\n";
@@ -392,6 +392,7 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
 
         if (!strcmp(pack->payload, "EXIT")) {
             pthread_mutex_lock(&mtable);
+            cout << "Entrei aqui!" << endl;
             table.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
             pthread_mutex_unlock(&mtable);
         } else {
@@ -617,7 +618,7 @@ static void participant_function() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
+    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -635,7 +636,7 @@ static void participant_function() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 my_ip_addr = inet_ntoa(teste->sin_addr);
             }
