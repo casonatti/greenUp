@@ -32,6 +32,10 @@ public:
     std::list<string> getAllParticipantsIP();
 
     string getParticipantMac(const string &hostname);
+
+    const char* getParticipantStatus(const string &IPAddress);
+
+    bool participantExists(const string &IPaddress);
 };
 
 void participantsTable::addParticipant(participant p) {
@@ -82,4 +86,17 @@ string participantsTable::getParticipantMac(const string& hostname) {
         }
     }
     return "";
+}
+
+const char* participantsTable::getParticipantStatus(const string& IPAddress) {
+    return table.at(IPAddress).status.c_str();
+}
+
+bool participantsTable::participantExists(const string &IPaddress) {
+    for (auto &ent: table) {
+        if (ent.second.IP == IPaddress) {
+            return true;
+        }
+    }
+    return false;
 }

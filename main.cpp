@@ -23,7 +23,7 @@ using namespace std;
 void signalHandler(int signum) {
     g_pack->type = TYPE_EXIT;
     g_pack->seqn = g_seqn;
-    strcpy(g_pack->payload, "EXIT");
+    strcpy(g_pack->payload, SLEEP_SERVICE_EXIT);
     g_pack->length = strlen(g_pack->payload);
 
     sendto(g_sockfd, g_pack, (1024 + sizeof(*g_pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
@@ -77,7 +77,7 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
             cout << "Sending command EXIT..." << endl;
             pthread_mutex_unlock(&mtx);
             pack->type = TYPE_EXIT;
-            strcpy(pack->payload, "EXIT");
+            strcpy(pack->payload, SLEEP_SERVICE_EXIT);
             pack->length = strlen(pack->payload);
             pack->seqn = 0;
 
@@ -88,10 +88,35 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
     }
 }
 
+[[noreturn]] static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
+    while(true) {
+        if(g_table_updated) {
+            pthread_mutex_lock(&mtx);
+            pthread_mutex_lock(&mtable);
+            system("clear");
+            table.printTable();
+            pthread_mutex_unlock(&mtable);
+            pthread_mutex_unlock(&mtx);
+            
+            g_table_updated = false;
+        }
+    }
+}
+
 [[noreturn]] static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
     ssize_t ret_value;
     struct sockaddr_in manager_addr{}, broadcast_addr{};
+    pthread_t thr_table_updater;
+    pthread_attr_t attr_table_updater;
+
+    ret_value = pthread_attr_init(&attr_table_updater);
+    if (ret_value != 0) {
+        cout << "Pthread_attr_init error." << endl;
+        exit(0);
+    }
+
+    pthread_create(&thr_table_updater, &attr_table_updater, &thr_manager_table_updater, nullptr);
 
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
@@ -175,6 +200,8 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
         sendto(sockfd, message.c_str(), message.length(), 0,
                (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
     }
+
+    pthread_join(thr_table_updater, nullptr);
 }
 
 static void *thr_participant_discovery_service(__attribute__((unused)) void *arg) {
@@ -389,21 +416,20 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             exit(0);
         }
 
-        if (!strcmp(pack->payload, "EXIT")) {
+        if (!strcmp(pack->payload, SLEEP_SERVICE_EXIT)) {
             pthread_mutex_lock(&mtable);
             table.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
+            g_table_updated = true;
             pthread_mutex_unlock(&mtable);
         } else {
             participant p = parsePayload(pack->payload);
-            pthread_mutex_lock(&mtable);
-            table.addParticipant(p);
-            pthread_mutex_unlock(&mtable);
+            if(!table.participantExists(p.IP)) {
+                pthread_mutex_lock(&mtable);
+                table.addParticipant(p);
+                g_table_updated = true;
+                pthread_mutex_unlock(&mtable);
+            }
         }
-        pthread_mutex_lock(&mtx);
-        pthread_mutex_lock(&mtable);
-        table.printTable();
-        pthread_mutex_unlock(&mtable);
-        pthread_mutex_unlock(&mtx);
     }
 }
 
@@ -578,21 +604,25 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
 
             ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                                  (struct sockaddr *) &p_address, &p_address_len);
+            
             if (ret_value < 0) {
-                pthread_mutex_lock(&mtable);
-                table.sleepParticipant(*it);
+                //Participant doesn't sent response => It's asleep
+                pthread_mutex_lock(&mtable);               
+                if(strcmp(table.getParticipantStatus(*it), "awake") == 0) {
+                    table.sleepParticipant(*it);
+                    g_table_updated = true;
+                }
                 pthread_mutex_unlock(&mtable);
             } else {
+                //Participant sent response => It's awake
                 pthread_mutex_lock(&mtable);
-                table.wakeParticipant(*it);
+                if(strcmp(table.getParticipantStatus(*it), "asleep") == 0) {
+                    table.wakeParticipant(*it);
+                    g_table_updated = true;
+                }
                 pthread_mutex_unlock(&mtable);
             }
         }
-        pthread_mutex_lock(&mtx);
-        pthread_mutex_lock(&mtable);
-        table.printTable();
-        pthread_mutex_unlock(&mtable);
-        pthread_mutex_unlock(&mtx);
         sleep(5);
     }
 }
