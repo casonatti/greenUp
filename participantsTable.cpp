@@ -40,7 +40,7 @@ public:
 
 void participantsTable::addParticipant(participant p) {
     p.status = "awake";
-    table.insert_or_assign(p.IP, p);
+    table.insert(std::pair<string, participant> (p.IP, p));
 }
 
 void participantsTable::deleteParticipant(const string &IPaddress) {
