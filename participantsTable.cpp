@@ -69,21 +69,6 @@ void participantsTable::wakeParticipant(const string &IPAddress) {
     table.at(IPAddress).status = "awake";
 }
 
-<<<<<<< HEAD
-void participantsTable::printTable(){
-    cout << "---------------------------------------------------------\n";
-    //cout << table.size() << endl;
-    cout << "|Hostname\t|MAC Address\t\t|IP Address\t\t|Status\t|\n";
-    for(auto &ent : table){
-        cout << "|" << ent.second.hostname << "\t";
-        cout << "|" << ent.second.MAC << "\t\t";
-        cout << "|" << ent.second.IP << "\t\t";
-        cout << "|" << ent.second.status << "\t|\n";
-    }
-    cout << "---------------------------------------------------------\n";
-    //cout << table.size() << endl;
-    //return;
-=======
 std::list<string> participantsTable::getAllParticipantsIP() {
     std::list<string> listP = {};
     auto it = listP.begin();
@@ -91,7 +76,6 @@ std::list<string> participantsTable::getAllParticipantsIP() {
         listP.insert(it, ent.second.IP);
     }
     return listP;
->>>>>>> 4f787e1ec681de18f6939a8a464ffe912a4470d2
 }
 
 string participantsTable::getParticipantMac(const string& hostname) {

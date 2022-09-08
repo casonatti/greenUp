@@ -34,10 +34,6 @@ bool g_has_manager = false;
 bool g_table_updated = false;
 struct sockaddr_in g_serv_addr{};
 struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
-<<<<<<< HEAD
-participantsTable table;
-=======
->>>>>>> 4f787e1ec681de18f6939a8a464ffe912a4470d2
 string my_hostname, my_mac_addr, my_ip_addr;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mtable = PTHREAD_MUTEX_INITIALIZER;
