@@ -1,41 +1,75 @@
 #include <iostream>
 #include <cstring>
 #include <map>
+#include <list>
+#include <iomanip>
+
 using namespace std;
 
 struct participant {
-    string hostname;       // Participant hostname
-    string MAC;            // Participant MAC address
-    string IP;             // Participant IP address
-    string status;               // Participant Status
+    string hostname;  // Participant hostname
+    string MAC;       // Participant MAC address
+    string IP;        // Participant IP address
+    string status;    // Participant status
 };
 
-class participantsTable{
-    public:
-        participantsTable(){
-            table;
-        }
-        std::map<string, participant> table;
-        
-        void updateTable(participant p);
-        void deleteParticipant(string IPaddress);
-        void printTable();
-        bool isAwake(string IPaddress);
-        void sleepTable();
+class participantsTable {
+public:
+    participantsTable() = default;
+
+    std::map<string, participant> table;
+
+    void addParticipant(participant p);
+
+    void deleteParticipant(const string &IPaddress);
+
+    void printTable();
+
+    void sleepParticipant(const string &IPaddress);
+
+    void wakeParticipant(const string &IPAddress);
+
+    std::list<string> getAllParticipantsIP();
+
+    string getParticipantMac(const string &hostname);
+
+    const char* getParticipantStatus(const string &IPAddress);
+
+    bool participantExists(const string &IPaddress);
 };
 
-void participantsTable::updateTable(participant p){
+void participantsTable::addParticipant(participant p) {
     p.status = "awake";
-    table.insert_or_assign(p.IP, p);
-    return;
+    table.insert(std::pair<string, participant> (p.IP, p));
 }
 
-void participantsTable::deleteParticipant(string IPaddress){
+void participantsTable::deleteParticipant(const string &IPaddress) {
     table.erase(IPaddress);
-    return;
 }
 
+void participantsTable::printTable() {
+    //system("clear");
+    cout << std::left;
+    cout << "--------------------------------------------------------------------------\n";
+    cout << "|Hostname \t|MAC Address      |IP Address     |Status|\n";
+    for (auto &ent: table) {
+        cout << "|" << setw(15) << ent.second.hostname;
+        cout << "|" << ent.second.MAC;
+        cout << "|" << setw(15) << ent.second.IP;
+        cout << "|" << setw(6) << ent.second.status << "|\n";
+    }
+    cout << "--------------------------------------------------------------------------\n";
+}
 
+void participantsTable::sleepParticipant(const string &IPAddress) {
+    table.at(IPAddress).status = "asleep";
+}
+
+void participantsTable::wakeParticipant(const string &IPAddress) {
+    table.at(IPAddress).status = "awake";
+}
+
+<<<<<<< HEAD
 void participantsTable::printTable(){
     cout << "---------------------------------------------------------\n";
     //cout << table.size() << endl;
@@ -49,22 +83,36 @@ void participantsTable::printTable(){
     cout << "---------------------------------------------------------\n";
     //cout << table.size() << endl;
     //return;
+=======
+std::list<string> participantsTable::getAllParticipantsIP() {
+    std::list<string> listP = {};
+    auto it = listP.begin();
+    for (auto &ent: table) {
+        listP.insert(it, ent.second.IP);
+    }
+    return listP;
+>>>>>>> 4f787e1ec681de18f6939a8a464ffe912a4470d2
 }
 
-bool participantsTable::isAwake(string IPaddress){
-    if(table.count(IPaddress)){
-        participant p = table.at(IPaddress);
-        return p.status == "awake";
+string participantsTable::getParticipantMac(const string& hostname) {
+    std::string macaddr = {};
+    for (auto &ent: table) {
+        if (ent.second.hostname == hostname) {
+            return ent.second.MAC;
+        }
+    }
+    return "";
+}
+
+const char* participantsTable::getParticipantStatus(const string& IPAddress) {
+    return table.at(IPAddress).status.c_str();
+}
+
+bool participantsTable::participantExists(const string &IPaddress) {
+    for (auto &ent: table) {
+        if (ent.second.IP == IPaddress) {
+            return true;
+        }
     }
     return false;
-}
-
-void participantsTable::sleepTable(){
-    cout << "entrei no sleepTable\n";
-    cout << table.size();
-    for(auto &ent : table){
-        ent.second.status = "asleep";
-        cout << ent.second.hostname;
-        cout << ent.second.IP;
-    }
 }
