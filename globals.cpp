@@ -5,6 +5,8 @@
 // -------------------------------------------------- CONSTANTS --------------------------------------------------------
 
 #define BUFFER_SIZE 128
+#define I_AM_MANAGER 0
+#define I_AM_PARTICIPANT 1
 #define PORT_DISCOVERY_SERVICE_BROADCAST 8000
 #define PORT_DISCOVERY_SERVICE_LISTENER 8001
 #define PORT_MONITORING_SERVICE_BROADCAST 9000
@@ -34,7 +36,7 @@ bool g_has_manager = false;
 bool g_table_updated = false;
 struct sockaddr_in g_serv_addr{};
 struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
-string my_hostname, my_mac_addr, my_ip_addr;
+string g_my_hostname, g_my_mac_addr, g_my_ip_addr;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mtable = PTHREAD_MUTEX_INITIALIZER;
 participantsTable table;

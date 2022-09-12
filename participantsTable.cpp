@@ -1,3 +1,5 @@
+#ifndef PARTICIPANTSTABLE
+#define PARTICIPANTSTABLE
 #include <iostream>
 #include <cstring>
 #include <map>
@@ -100,3 +102,5 @@ bool participantsTable::participantExists(const string &IPaddress) {
     }
     return false;
 }
+
+#endif

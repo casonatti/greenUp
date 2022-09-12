@@ -268,7 +268,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             g_has_manager = true;
         }
 
-        string s_payload = my_hostname + ", " + my_mac_addr + ", " + my_ip_addr;
+        string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + g_my_ip_addr;
         strcpy(pack->payload, s_payload.data());
         pack->type = TYPE_DISCOVERY;
         pack->length = strlen(pack->payload);
@@ -342,20 +342,6 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
             cout << "Sendto error." << endl;
             exit(0);
         }
-
-        /*// wake on lan test
-
-        string message = "\xFF\xFF\xFF\xFF\xFF\xFF";
-        string mac_addr = "\xAB\xCD\xEF\x01\x23\x45";
-        for (int i = 16; i > 0; i--) {
-            message += mac_addr;
-        }
-        ret_value = sendto(sockfd, message.c_str(), message.length(), 0,
-                           (struct sockaddr *) &broadcast_addr,sizeof broadcast_addr);
-        if (ret_value < 0) {
-            cout << "Sendto error." << endl;
-            exit(0);
-        }*/
 
         sleep(8);
     }
@@ -631,53 +617,7 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
 }
 
 static void participant_function() {
-    int i;
     ssize_t ret_value;
-    const char *status;
-    struct sockaddr_in *teste;
-    struct ifaddrs *ifap, *ifa;
-    pthread_mutex_lock(&mtx);
-    cout << "========= Configurando o Participante =========" << endl;
-
-    cout << "Getting my hostname..." << endl;
-    pthread_mutex_unlock(&mtx);
-    char c_my_hostname[32];
-    gethostname(c_my_hostname, 32);
-    my_hostname = c_my_hostname;
-    pthread_mutex_lock(&mtx);
-    cout << "My hostname = " << my_hostname << endl << endl;
-
-    cout << "Getting my MAC address..." << endl;
-    pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
-    i = 0;
-    char c_my_mac_addr[16];
-    while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
-        if (c_my_mac_addr[i] != '\n')
-            my_mac_addr += c_my_mac_addr[i];
-        i++;
-    }
-    pthread_mutex_lock(&mtx);
-    cout << "My MAC address = " << my_mac_addr << endl << endl;
-    fclose(file);
-
-    cout << "Getting my IP address..." << endl;
-    pthread_mutex_unlock(&mtx);
-    getifaddrs(&ifap);
-    for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
-            // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
-                teste = (struct sockaddr_in *) ifa->ifa_addr;
-                my_ip_addr = inet_ntoa(teste->sin_addr);
-            }
-        }
-    }
-    pthread_mutex_lock(&mtx);
-    cout << "My IP address = " << my_ip_addr << endl << endl;
-
-    cout << "===============================================" << endl << endl;
-    pthread_mutex_unlock(&mtx);
 
     // ---------------------------------------------- SUBSERVICES ------------------------------------------------------
 
@@ -699,17 +639,17 @@ static void participant_function() {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
-
+    
+    pthread_create(&thr_interface, &attr_interface, &thr_participant_interface_service,
+                   nullptr);
     pthread_create(&thr_discovery, &attr_discovery, &thr_participant_discovery_service,
                    nullptr);
     pthread_create(&thr_monitoring, &attr_monitoring, &thr_participant_monitoring_service,
                    nullptr);
-    pthread_create(&thr_interface, &attr_interface, &thr_participant_interface_service,
-                   nullptr);
 
+    pthread_join(thr_interface, nullptr);
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
-    pthread_join(thr_interface, nullptr);
 }
 
 static void manager_function() {
@@ -736,21 +676,78 @@ static void manager_function() {
         exit(0);
     }
 
-    pthread_create(&thr_discovery, &attr_discovery, &thr_manager_discovery_service, nullptr);
-    pthread_create(&thr_monitoring, &attr_monitoring, &thr_manager_monitoring_service, nullptr);
     pthread_create(&thr_interface, &attr_interface, &thr_manager_interface_service, nullptr);
+    pthread_create(&thr_discovery, &attr_discovery, &thr_manager_discovery_service, nullptr);
+    sleep(2);
+    pthread_create(&thr_monitoring, &attr_monitoring, &thr_manager_monitoring_service, nullptr);
 
+    pthread_join(thr_interface, nullptr);
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
-    pthread_join(thr_interface, nullptr);
+}
+
+int initialize() {
+    int i;
+    const char *status;
+    struct sockaddr_in *teste;
+    struct ifaddrs *ifap, *ifa;
+
+    pthread_mutex_lock(&mtx);
+    cout << "============ Getting started ============" << endl;
+
+    cout << "Getting my hostname..." << endl;
+    pthread_mutex_unlock(&mtx);
+    char c_my_hostname[32];
+    gethostname(c_my_hostname, 32);
+    g_my_hostname = c_my_hostname;
+    pthread_mutex_lock(&mtx);
+    cout << "My hostname = " << g_my_hostname << endl << endl;
+
+    cout << "Getting my MAC address..." << endl;
+    pthread_mutex_unlock(&mtx);
+    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
+    i = 0;
+    char c_my_mac_addr[16];
+    while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
+        if (c_my_mac_addr[i] != '\n')
+            g_my_mac_addr += c_my_mac_addr[i];
+        i++;
+    }
+    pthread_mutex_lock(&mtx);
+    cout << "My MAC address = " << g_my_mac_addr << endl << endl;
+    fclose(file);
+
+    cout << "Getting my IP address..." << endl;
+    pthread_mutex_unlock(&mtx);
+    getifaddrs(&ifap);
+    for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
+            // TODO: colocar o nome da interface de rede
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
+                teste = (struct sockaddr_in *) ifa->ifa_addr;
+                g_my_ip_addr = inet_ntoa(teste->sin_addr);
+            }
+        }
+    }
+    pthread_mutex_lock(&mtx);
+    cout << "My IP address = " << g_my_ip_addr << endl;
+
+    cout << "=========================================" << endl << endl;
+    pthread_mutex_unlock(&mtx);
+
+    //TODO: check if there's a manager to decide if start as a participant or start as the manager
+    return 0;
 }
 
 // ------------------------------------------------ MAIN CODE section --------------------------------------------------
 
 int main(int argc, char **argv) {
-    // TODO: signal for CTRL+D
     signal(SIGINT, signalHandler); // CTRL+C
     signal(SIGHUP, signalHandler); // terminal closed while process still running
+
+    int what_am_i = -1;
+
+    initialize();
 
 // ----------------------------------------------- PARTICIPANT section -------------------------------------------------
 
