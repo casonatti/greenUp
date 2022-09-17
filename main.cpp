@@ -51,6 +51,8 @@ participant parsePayload(string payLoad) {
             case 1:
                 p.MAC = token;
                 break;
+            case 2:
+                p.pid = stoi(token);
             default:
                 break;
         }
@@ -90,22 +92,21 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
     }
 }
 
-[[noreturn]] static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
+static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
     while(true) {
         if(g_table_updated) {
             pthread_mutex_lock(&mtx);
             pthread_mutex_lock(&mtable);
             system("clear");
             table.printTable();
+            g_table_updated = false;
             pthread_mutex_unlock(&mtable);
             pthread_mutex_unlock(&mtx);
-            
-            g_table_updated = false;
         }
     }
 }
 
-[[noreturn]] static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
+static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
     ssize_t ret_value;
     struct sockaddr_in manager_addr{}, broadcast_addr{};
@@ -206,6 +207,70 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
     pthread_join(thr_table_updater, nullptr);
 }
 
+static void *thr_manager_multicast(__attribute__((unused)) void *arg) {
+    int sockfd, true_flag = true;
+    ssize_t ret_value;
+    socklen_t broadcast_len = sizeof(struct sockaddr_in);
+    struct sockaddr_in broadcast_addr{};
+    auto *pack = (struct packet *) malloc(sizeof(struct packet));
+
+    // creates participant's discovery socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        cout << "Socket creation error";
+        exit(0);
+    }
+
+    // set socket options broadcast and reuseaddr to true
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_BROADCAST] error." << endl;
+        exit(0);
+    }
+
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_REUSEADDR] error." << endl;
+        exit(0);
+    }
+
+    // configure manager's discovery broadcast address
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_BROADCAST);
+    broadcast_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    // bind the participant's discovery socket to the listening port
+    ret_value = bind(sockfd, (struct sockaddr *) &broadcast_addr, broadcast_len);
+    if (ret_value < 0) {
+        cout << "Bind socket error." << endl;
+        exit(0);
+    }
+
+    while(true) {
+        ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
+                             (struct sockaddr *) &broadcast_addr, &broadcast_len);
+        if (ret_value < 0) {
+            cout << "Recvfrom error.";
+            exit(0);
+        }
+
+        if(!strcmp(pack->payload, KEEP_ALIVE)) {
+            string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + to_string(g_my_pid) + ", " + g_my_ip_addr;
+            pack->type = TYPE_KEEP_ALIVE;
+            strcpy(pack->payload, s_payload.data());
+            
+            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                           (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+            if (ret_value < 0) {
+                cout << "Sendto error.";
+                exit(0);
+            }
+        }
+    }
+}
+
 static void *thr_participant_discovery_service(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
     ssize_t ret_value;
@@ -258,17 +323,18 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
         if (!g_has_manager) {
             g_serv_addr = manager_addr;
             pthread_mutex_lock(&mtx);
+            cout << "====================== MANAGER INFO ======================\n";
             cout << "----------------------------------------------------------\n";
             cout << "|Hostname\t|MAC Address\t\t|IP Address\n";
-            cout << "|" << "m. hostname" << "\t";
-            cout << "|" << "m. mac address" << "\t\t";
+            cout << "|" << g_manager_hostname << "\t";
+            cout << "|" << g_manager_MAC << "\t";
             cout << "|" << inet_ntoa(g_serv_addr.sin_addr) << "\n";
             cout << "----------------------------------------------------------\n";
             pthread_mutex_unlock(&mtx);
             g_has_manager = true;
         }
 
-        string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + g_my_ip_addr;
+        string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + to_string(g_my_pid) + ", " + g_my_ip_addr;
         strcpy(pack->payload, s_payload.data());
         pack->type = TYPE_DISCOVERY;
         pack->length = strlen(pack->payload);
@@ -395,7 +461,6 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
 
     // ------------------------------------------- DISCOVERY LISTENER --------------------------------------------------
 
-    participant p;
     // loop responsible for receiving answers to broadcasted discovery packets
     while (true) {
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
@@ -657,8 +722,8 @@ static void manager_function() {
     // ---------------------------------------------- SUBSERVICES ------------------------------------------------------
 
     ssize_t ret_value;
-    pthread_t thr_discovery, thr_monitoring, thr_interface;
-    pthread_attr_t attr_discovery, attr_monitoring, attr_interface;
+    pthread_t thr_discovery, thr_monitoring, thr_interface, thr_multicast;
+    pthread_attr_t attr_discovery, attr_monitoring, attr_interface, attr_multicast;
 
     ret_value = pthread_attr_init(&attr_discovery);
     if (ret_value != 0) {
@@ -675,25 +740,36 @@ static void manager_function() {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
+    ret_value = pthread_attr_init(&attr_multicast);
+    if (ret_value != 0) {
+        cout << "Pthread_attr_init error." << endl;
+        exit(0);
+    }
 
     pthread_create(&thr_interface, &attr_interface, &thr_manager_interface_service, nullptr);
+    pthread_create(&thr_multicast, &attr_multicast, &thr_manager_multicast, nullptr);
     pthread_create(&thr_discovery, &attr_discovery, &thr_manager_discovery_service, nullptr);
     sleep(2);
     pthread_create(&thr_monitoring, &attr_monitoring, &thr_manager_monitoring_service, nullptr);
 
     pthread_join(thr_interface, nullptr);
+    pthread_join(thr_multicast, nullptr);
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
 }
 
-int initialize() {
+void initialize() {
     int i;
     const char *status;
     struct sockaddr_in *teste;
     struct ifaddrs *ifap, *ifa;
 
     pthread_mutex_lock(&mtx);
-    cout << "============ Getting started ============" << endl;
+    cout << "============ Getting host info ============" << endl;
+
+    cout << "Getting my pid..." << endl;
+    g_my_pid = getpid();
+    cout << "My PID = " << g_my_pid << endl << endl;
 
     cout << "Getting my hostname..." << endl;
     pthread_mutex_unlock(&mtx);
@@ -713,9 +789,9 @@ int initialize() {
             g_my_mac_addr += c_my_mac_addr[i];
         i++;
     }
+    fclose(file);
     pthread_mutex_lock(&mtx);
     cout << "My MAC address = " << g_my_mac_addr << endl << endl;
-    fclose(file);
 
     cout << "Getting my IP address..." << endl;
     pthread_mutex_unlock(&mtx);
@@ -732,11 +808,81 @@ int initialize() {
     pthread_mutex_lock(&mtx);
     cout << "My IP address = " << g_my_ip_addr << endl;
 
-    cout << "=========================================" << endl << endl;
+    cout << "===========================================" << endl << endl;
     pthread_mutex_unlock(&mtx);
+}
 
-    //TODO: check if there's a manager to decide if start as a participant or start as the manager
-    return 0;
+bool isManagerAlive() {
+    int sockfd, true_flag = true;
+    ssize_t ret_value;
+    struct sockaddr_in broadcast_addr{}, m_address{};
+    socklen_t m_address_len = sizeof(struct sockaddr_in);
+    auto *pack = (struct packet *) malloc(sizeof(struct packet));
+
+    // creates manager's discovery socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        cout << "Socket creation error";
+        exit(0);
+    }
+
+    // set socket options broadcast and reuseaddr to true
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_BROADCAST] error." << endl;
+        exit(0);
+    }
+
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_REUSEADDR] error." << endl;
+        exit(0);
+    }
+
+    // set timeout for socket
+    struct timeval timeout{};
+    timeout.tv_sec = 5;
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+    
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_RCVTIMEO] error." << endl;
+        exit(0);
+    }
+
+    // configure manager's discovery broadcast address
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_BROADCAST);
+    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    
+    pack->type = TYPE_KEEP_ALIVE;
+    strcpy(pack->payload, KEEP_ALIVE);
+    pack->length = strlen(pack->payload);
+
+    ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                        (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+    if (ret_value < 0) {
+        cout << "Sendto error." << endl;
+        exit(0);
+    }
+
+    ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
+                                 (struct sockaddr *) &m_address, &m_address_len);
+            
+    if (ret_value < 0) {
+        //Manager doesn't sent response => There's no manager
+        cout << "TIMEOUT EXPIRED!" << endl << endl;
+        return false;
+    } else {
+        //Manager sent response => There's a manager
+        //TODO: Bully algorithm
+        participant m = parsePayload(pack->payload);
+        g_manager_hostname = m.hostname;
+        g_manager_MAC = m.MAC;
+        g_manager_ip = m.IP;
+        return true;
+    }
 }
 
 // ------------------------------------------------ MAIN CODE section --------------------------------------------------
@@ -744,24 +890,19 @@ int initialize() {
 int main(int argc, char **argv) {
     signal(SIGINT, signalHandler); // CTRL+C
     signal(SIGHUP, signalHandler); // terminal closed while process still running
-
-    int what_am_i = -1;
-
+    
     initialize();
 
-// ----------------------------------------------- PARTICIPANT section -------------------------------------------------
-
-    if (argc == 1) {
+    if(isManagerAlive()) {
+        cout << "Initializing Participant..." << endl << endl;
+        sleep(2);
         participant_function();
-    }
-
-// ------------------------------------------------- MANAGER section ---------------------------------------------------
-
-    // argv[1] does exist and equals to "manager".
-    if (argc == 2 && strcmp(argv[1], "manager") == 0) {
+    } else {
+        cout << "Initializing Manager..." << endl << endl;
+        sleep(2);
         manager_function();
     }
 
-    cout << "Call: ./sleep_server OR ./sleep_server manager" << endl;
+    cout << "Call: ./sleep_server" << endl;
     return -1;
 }

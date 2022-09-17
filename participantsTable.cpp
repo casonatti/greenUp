@@ -13,6 +13,7 @@ struct participant {
     string MAC;       // Participant MAC address
     string IP;        // Participant IP address
     string status;    // Participant status
+    int pid;        // Participant PID
 };
 
 class participantsTable {
