@@ -210,8 +210,8 @@ static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
 static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
     ssize_t ret_value;
-    socklen_t broadcast_len = sizeof(struct sockaddr_in);
-    struct sockaddr_in broadcast_addr{};
+    socklen_t newcommer_len = sizeof(struct sockaddr_in);
+    struct sockaddr_in broadcast_addr{}, newcommer_addr;
     auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
     // creates participant's discovery socket
@@ -242,7 +242,7 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
     broadcast_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     // bind the participant's discovery socket to the listening port
-    ret_value = bind(sockfd, (struct sockaddr *) &broadcast_addr, broadcast_len);
+    ret_value = bind(sockfd, (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
     if (ret_value < 0) {
         cout << "Bind socket error." << endl;
         exit(0);
@@ -250,20 +250,20 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
 
     while(true) {
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
-                             (struct sockaddr *) &broadcast_addr, &broadcast_len);
+                             (struct sockaddr *) &newcommer_addr, &newcommer_len);
         if (ret_value < 0) {
             cout << "Recvfrom error.";
             exit(0);
         }
 
-        if(!strcmp(pack->payload, KEEP_ALIVE)) {
+        if(!strcmp(pack->payload, NEWCOMMER)) {
             // send the manager info to the newcommer participant
             string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + to_string(g_my_pid) + ", " + g_my_ip_addr;
-            pack->type = TYPE_KEEP_ALIVE;
+            pack->type = TYPE_NEWCOMMER;
             strcpy(pack->payload, s_payload.data());
             
             ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                           (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+                           (struct sockaddr *) &newcommer_addr, sizeof newcommer_addr);
             if (ret_value < 0) {
                 cout << "Sendto error.";
                 exit(0);
@@ -818,7 +818,12 @@ void initialize() {
     pthread_mutex_unlock(&mtx);
 }
 
-bool isManagerAlive() { // TODO: mudar o nome da função ... newcommer ou algo assim
+bool isManagerAlive(int socket_fd, sockaddr_in manager_addr) {
+
+    return false;
+}
+
+bool newcommer() {
     int sockfd, true_flag = true;
     ssize_t ret_value;
     struct sockaddr_in broadcast_addr{}, m_address{};
@@ -849,7 +854,7 @@ bool isManagerAlive() { // TODO: mudar o nome da função ... newcommer ou algo 
 
     // set timeout for socket
     struct timeval timeout{};
-    timeout.tv_sec = 5;
+    timeout.tv_sec = 3;
     ret_value = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
     
     if (ret_value < 0) {
@@ -862,8 +867,8 @@ bool isManagerAlive() { // TODO: mudar o nome da função ... newcommer ou algo 
     broadcast_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_BROADCAST);
     broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
     
-    pack->type = TYPE_KEEP_ALIVE;
-    strcpy(pack->payload, KEEP_ALIVE);
+    pack->type = TYPE_NEWCOMMER;
+    strcpy(pack->payload, NEWCOMMER);
     pack->length = strlen(pack->payload);
 
     ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
@@ -882,7 +887,6 @@ bool isManagerAlive() { // TODO: mudar o nome da função ... newcommer ou algo 
         return false;
     } else {
         //Manager sent response => There's a manager
-        //TODO: Bully algorithm
         participant m = parsePayload(pack->payload);
         g_manager_hostname = m.hostname;
         g_manager_MAC = m.MAC;
@@ -897,9 +901,13 @@ int main(int argc, char **argv) {
     signal(SIGINT, signalHandler); // CTRL+C
     signal(SIGHUP, signalHandler); // terminal closed while process still running
     
+    bool manager_alive = false;
+
     initialize();
 
-    if(isManagerAlive()) {
+    manager_alive = newcommer();
+
+    if(manager_alive) {
         cout << "Initializing Participant..." << endl << endl;
         sleep(2);
         participant_function();
