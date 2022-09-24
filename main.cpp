@@ -207,7 +207,7 @@ static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
     pthread_join(thr_table_updater, nullptr);
 }
 
-static void *thr_manager_multicast(__attribute__((unused)) void *arg) {
+static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
     ssize_t ret_value;
     socklen_t broadcast_len = sizeof(struct sockaddr_in);
@@ -257,6 +257,7 @@ static void *thr_manager_multicast(__attribute__((unused)) void *arg) {
         }
 
         if(!strcmp(pack->payload, KEEP_ALIVE)) {
+            // send the manager info to the newcommer participant
             string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + to_string(g_my_pid) + ", " + g_my_ip_addr;
             pack->type = TYPE_KEEP_ALIVE;
             strcpy(pack->payload, s_payload.data());
@@ -267,6 +268,11 @@ static void *thr_manager_multicast(__attribute__((unused)) void *arg) {
                 cout << "Sendto error.";
                 exit(0);
             }
+
+            // send the list of all participants to the newcommer participant (for bully algorithm)
+            list<string> all_participants = table.getAllParticipantsIP();
+
+            // pack->payload = all_participants;
         }
     }
 }
@@ -747,7 +753,7 @@ static void manager_function() {
     }
 
     pthread_create(&thr_interface, &attr_interface, &thr_manager_interface_service, nullptr);
-    pthread_create(&thr_multicast, &attr_multicast, &thr_manager_multicast, nullptr);
+    pthread_create(&thr_multicast, &attr_multicast, &thr_manager_newcommer_service, nullptr);
     pthread_create(&thr_discovery, &attr_discovery, &thr_manager_discovery_service, nullptr);
     sleep(2);
     pthread_create(&thr_monitoring, &attr_monitoring, &thr_manager_monitoring_service, nullptr);
@@ -812,7 +818,7 @@ void initialize() {
     pthread_mutex_unlock(&mtx);
 }
 
-bool isManagerAlive() {
+bool isManagerAlive() { // TODO: mudar o nome da função ... newcommer ou algo assim
     int sockfd, true_flag = true;
     ssize_t ret_value;
     struct sockaddr_in broadcast_addr{}, m_address{};
