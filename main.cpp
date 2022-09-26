@@ -22,6 +22,8 @@ using namespace std;
 
 // ---------------------------------------------------------------------------------------------------------------------
 
+bool isManagerAlive(int socket_fd, sockaddr_in manager_addr);
+
 void signalHandler(int signum) {
     g_pack->type = TYPE_EXIT;
     g_pack->seqn = g_seqn;
@@ -88,6 +90,60 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
             sendto(g_sockfd, pack, (1024 + sizeof(*pack)), 0,
                    (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
             exit(0);
+        }
+    }
+}
+
+static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void *arg) {
+    int sock_fd;
+    bool manager_alive = false;
+    ssize_t ret_value;
+    struct sockaddr_in manager_addr{};
+
+    sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    manager_addr.sin_family = AF_INET;
+    manager_addr.sin_port = (in_port_t) htons(PORT_KEEP_ALIVE_LISTENER);
+    manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    while(!g_has_manager);
+
+    while(true) {
+        manager_alive = isManagerAlive(sock_fd, manager_addr);
+
+        if(!manager_alive) {
+            cout << "Election!" << endl << endl;
+        }
+        sleep(4);
+    }
+}
+
+static void *thr_manager_keep_alive(__attribute__((unused)) void *arg) {
+    int sock_fd, true_flag = 1;
+    ssize_t ret_value;
+    struct sockaddr_in manager_addr{}, from{};
+    socklen_t from_len = sizeof(struct sockaddr_in);
+    auto *pack = (struct packet *) malloc(sizeof(struct packet));
+
+    sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    manager_addr.sin_family = AF_INET;
+    manager_addr.sin_port = (in_port_t) htons(PORT_KEEP_ALIVE_LISTENER);
+    manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    bind(sock_fd, (struct sockaddr *) &manager_addr, sizeof(manager_addr));
+
+    while(true) {
+        recvfrom(sock_fd, pack, sizeof(*pack), 0,
+                    (struct sockaddr *) &from, &from_len);
+
+        if(!strcmp(pack->payload, KEEP_ALIVE)) {
+            pack->type = TYPE_KEEP_ALIVE;
+            strcpy(pack->payload, "ACK");
+            pack->length = strlen(pack->payload);
+
+            sendto(sock_fd, pack, (1024 + sizeof(*pack)), 0,
+                    (struct sockaddr *) &from, sizeof from);
         }
     }
 }
@@ -692,8 +748,8 @@ static void participant_function() {
 
     // ---------------------------------------------- SUBSERVICES ------------------------------------------------------
 
-    pthread_t thr_discovery, thr_monitoring, thr_interface;
-    pthread_attr_t attr_discovery, attr_monitoring, attr_interface;
+    pthread_t thr_discovery, thr_monitoring, thr_interface, thr_keep_alive;
+    pthread_attr_t attr_discovery, attr_monitoring, attr_interface, attr_keep_alive;
 
     ret_value = pthread_attr_init(&attr_discovery);
     if (ret_value != 0) {
@@ -710,12 +766,19 @@ static void participant_function() {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
+    ret_value = pthread_attr_init(&attr_keep_alive);
+    if (ret_value != 0) {
+        cout << "Pthread_attr_init error." << endl;
+        exit(0);
+    }
     
     pthread_create(&thr_interface, &attr_interface, &thr_participant_interface_service,
                    nullptr);
     pthread_create(&thr_discovery, &attr_discovery, &thr_participant_discovery_service,
                    nullptr);
     pthread_create(&thr_monitoring, &attr_monitoring, &thr_participant_monitoring_service,
+                   nullptr);
+    pthread_create(&thr_keep_alive, &attr_keep_alive, &thr_participant_keep_alive_monitoring,
                    nullptr);
 
     pthread_join(thr_interface, nullptr);
@@ -728,8 +791,8 @@ static void manager_function() {
     // ---------------------------------------------- SUBSERVICES ------------------------------------------------------
 
     ssize_t ret_value;
-    pthread_t thr_discovery, thr_monitoring, thr_interface, thr_multicast;
-    pthread_attr_t attr_discovery, attr_monitoring, attr_interface, attr_multicast;
+    pthread_t thr_discovery, thr_monitoring, thr_interface, thr_manager_newcommer, thr_keep_alive;
+    pthread_attr_t attr_discovery, attr_monitoring, attr_interface, attr_newcommer, attr_keep_alive;
 
     ret_value = pthread_attr_init(&attr_discovery);
     if (ret_value != 0) {
@@ -746,20 +809,26 @@ static void manager_function() {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
-    ret_value = pthread_attr_init(&attr_multicast);
+    ret_value = pthread_attr_init(&attr_newcommer);
+    if (ret_value != 0) {
+        cout << "Pthread_attr_init error." << endl;
+        exit(0);
+    }
+    ret_value = pthread_attr_init(&attr_keep_alive);
     if (ret_value != 0) {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
 
     pthread_create(&thr_interface, &attr_interface, &thr_manager_interface_service, nullptr);
-    pthread_create(&thr_multicast, &attr_multicast, &thr_manager_newcommer_service, nullptr);
+    pthread_create(&thr_manager_newcommer, &attr_newcommer, &thr_manager_newcommer_service, nullptr);
     pthread_create(&thr_discovery, &attr_discovery, &thr_manager_discovery_service, nullptr);
+    pthread_create(&thr_keep_alive, &attr_keep_alive, &thr_manager_keep_alive, nullptr);
     sleep(2);
     pthread_create(&thr_monitoring, &attr_monitoring, &thr_manager_monitoring_service, nullptr);
 
     pthread_join(thr_interface, nullptr);
-    pthread_join(thr_multicast, nullptr);
+    pthread_join(thr_manager_newcommer, nullptr);
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
 }
@@ -819,8 +888,37 @@ void initialize() {
 }
 
 bool isManagerAlive(int socket_fd, sockaddr_in manager_addr) {
+    int ret_value;
+    struct sockaddr_in from{};
+    socklen_t from_len = sizeof(struct sockaddr_in);
+    auto *pack = (struct packet *) malloc(sizeof(struct packet));
 
-    return false;
+    // set timeout for socket
+    struct timeval timeout{};
+    timeout.tv_sec = 2;
+    ret_value = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_RCVTIMEO] error." << endl;
+        exit(0);
+    }
+
+    pack->type = TYPE_KEEP_ALIVE;
+    strcpy(pack->payload, KEEP_ALIVE);
+    pack->length = strlen(pack->payload);
+
+    ret_value = sendto(socket_fd, pack, (1024 + sizeof(*pack)), 0,
+                        (struct sockaddr *) &manager_addr, sizeof manager_addr);
+
+    ret_value = recvfrom(socket_fd, pack, sizeof(*pack), 0,
+                            (struct sockaddr *) &from, &from_len);
+
+    free(pack);
+    if(ret_value < 0) {
+        cout << "Time expired [isManagerAlive()]" << endl;
+        return false;
+    } else {
+        return true;
+    }
 }
 
 bool newcommer() {
