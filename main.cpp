@@ -149,6 +149,11 @@ static void *thr_manager_keep_alive(__attribute__((unused)) void *arg) {
 }
 
 static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
+  pthread_mutex_lock(&mtable);
+  system("clear");
+  table.printTable();
+  pthread_mutex_unlock(&mtable);
+  
     while(true) {
         if(g_table_updated) {
             pthread_mutex_lock(&mtx);
@@ -784,6 +789,7 @@ static void participant_function() {
     pthread_join(thr_interface, nullptr);
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
+    pthread_join(thr_monitoring, nullptr);
 }
 
 static void manager_function() {
@@ -824,12 +830,12 @@ static void manager_function() {
     pthread_create(&thr_manager_newcommer, &attr_newcommer, &thr_manager_newcommer_service, nullptr);
     pthread_create(&thr_discovery, &attr_discovery, &thr_manager_discovery_service, nullptr);
     pthread_create(&thr_keep_alive, &attr_keep_alive, &thr_manager_keep_alive, nullptr);
-    sleep(2);
     pthread_create(&thr_monitoring, &attr_monitoring, &thr_manager_monitoring_service, nullptr);
 
     pthread_join(thr_interface, nullptr);
     pthread_join(thr_manager_newcommer, nullptr);
     pthread_join(thr_discovery, nullptr);
+    pthread_join(thr_keep_alive, nullptr);
     pthread_join(thr_monitoring, nullptr);
 }
 
@@ -856,7 +862,7 @@ void initialize() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
+    FILE *file = fopen("/sys/class/net/eth0/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -874,7 +880,7 @@ void initialize() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
+            if (strcmp(ifa->ifa_name, "eth0") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 g_my_ip_addr = inet_ntoa(teste->sin_addr);
             }
