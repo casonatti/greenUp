@@ -12,8 +12,7 @@
 #include <unistd.h>
 #include <cstdlib> // exit() precisa desse include nos labs do inf
 #include <mutex>
-#include "participantsTable.cpp"
-
+#include "packet.h"
 using namespace std;
 
 // ------------------------------------------------ GLOBAL VAR section -------------------------------------------------
@@ -35,10 +34,10 @@ void signalHandler(int signum) {
   exit(signum);
 }
 
-participant parsePayload(string payLoad) {
+Participant parsePayload(string payLoad) {
   std::string s;
   std::string delimiter = ", ";
-  participant p;
+  Participant p;
   int i = 0;
   
   s = payLoad;
@@ -67,7 +66,7 @@ participant parsePayload(string payLoad) {
 
 static void *thr_participant_interface_service(__attribute__((unused)) void *arg) {
   char buffer[32];
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   // creates participant's discovery socket
   g_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -106,7 +105,9 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
     
     if (!manager_alive) {
       cout << "Election!" << endl << endl;
+
     }
+
     sleep(4);
   }
 }
@@ -116,7 +117,7 @@ static void *thr_manager_keep_alive(__attribute__((unused)) void *arg) {
   ssize_t ret_value;
   struct sockaddr_in manager_addr{}, from{};
   socklen_t from_len = sizeof(struct sockaddr_in);
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
   
@@ -142,19 +143,15 @@ static void *thr_manager_keep_alive(__attribute__((unused)) void *arg) {
 }
 
 static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
-  pthread_mutex_lock(&mtable);
   system("clear");
-  table.printTable();
-  pthread_mutex_unlock(&mtable);
+  pTable.printTable();
   
   while (true) {
     if (g_table_updated) {
       pthread_mutex_lock(&mtx);
-      pthread_mutex_lock(&mtable);
       system("clear");
-      table.printTable();
+      pTable.printTable();
       g_table_updated = false;
-      pthread_mutex_unlock(&mtable);
       pthread_mutex_unlock(&mtx);
     }
   }
@@ -236,7 +233,7 @@ static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
     }
     
     stream >> word;
-    string macaddr = table.getParticipantMac(word);
+    string macaddr = pTable.getParticipantMac(word);
     if (macaddr.empty()) {
       pthread_mutex_lock(&mtx);
       cout << "Hostname not found" << endl;
@@ -258,7 +255,7 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
   ssize_t ret_value;
   socklen_t newcommer_len = sizeof(struct sockaddr_in);
   struct sockaddr_in broadcast_addr{}, newcommer_addr;
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   // creates participant's discovery socket
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -316,7 +313,7 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
       }
       
       // send the list of all participants to the newcommer participant (for bully algorithm)
-      list<string> all_participants = table.getAllParticipantsIP();
+      list<string> all_participants = pTable.getAllParticipantsIP();
       
       // pack->payload = all_participants;
     }
@@ -328,7 +325,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
   ssize_t ret_value;
   socklen_t manager_len = sizeof(struct sockaddr_in);
   struct sockaddr_in manager_addr{};
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   // creates participant's discovery socket
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -404,7 +401,7 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
   int sockfd, seqn = 1, true_flag = true;
   ssize_t ret_value;
   struct sockaddr_in manager_addr{}, broadcast_addr{};
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   // creates manager's discovery socket
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -460,7 +457,7 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
       cout << "Sendto error." << endl;
       exit(0);
     }
-    
+    pTable.printTable();
     sleep(8);
   }
 }
@@ -470,7 +467,7 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
   ssize_t ret_value;
   socklen_t participant_len = sizeof(struct sockaddr_in);
   struct sockaddr_in manager_addr{}, broadcast_addr{}, participant_addr{};
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   // creates manager's discovery socket
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -523,17 +520,13 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
     }
     
     if (!strcmp(pack->payload, SLEEP_SERVICE_EXIT)) {
-      pthread_mutex_lock(&mtable);
-      table.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
+      pTable.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
       g_table_updated = true;
-      pthread_mutex_unlock(&mtable);
     } else if(pack->type == TYPE_DISCOVERY) {
-      participant p = parsePayload(pack->payload);
-      if (!table.participantExists(p.IP)) {
-        pthread_mutex_lock(&mtable);
-        table.addParticipant(p);
+      Participant p = parsePayload(pack->payload);
+      if (!pTable.participantExists(p.IP)) {
+        pTable.addParticipant(p);
         g_table_updated = true;
-        pthread_mutex_unlock(&mtable);
       }
     }
   }
@@ -574,7 +567,7 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
   ssize_t ret_value;
   socklen_t manager_len = sizeof(struct sockaddr_in);
   struct sockaddr_in manager_addr{};
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   // creates participant's monitoring socket
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -637,7 +630,7 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
   ssize_t ret_value;
   struct sockaddr_in manager_addr{}, p_address{};
   socklen_t p_address_len = sizeof(struct sockaddr_in);
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   // creates manager's monitoring socket
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -690,9 +683,7 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
   
   // loop responsible for broadcasting monitoring packets
   while (true) {
-    pthread_mutex_lock(&mtable);
-    list<string> listIP = table.getAllParticipantsIP();
-    pthread_mutex_unlock(&mtable);
+    list<string> listIP = pTable.getAllParticipantsIP();
     list<string>::iterator it;
     for (it = listIP.begin(); it != listIP.end(); ++it) {
       pack->type = TYPE_MONITORING;
@@ -713,20 +704,16 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
       
       if (ret_value < 0) {
         //Participant doesn't sent response => It's asleep
-        pthread_mutex_lock(&mtable);
-        if (strcmp(table.getParticipantStatus(*it), "awake") == 0) {
-          table.sleepParticipant(*it);
+        if (strcmp(pTable.getParticipantStatus(*it), "awake") == 0) {
+          pTable.sleepParticipant(*it);
           g_table_updated = true;
         }
-        pthread_mutex_unlock(&mtable);
       } else {
         //Participant sent response => It's awake
-        pthread_mutex_lock(&mtable);
-        if (strcmp(table.getParticipantStatus(*it), "asleep") == 0) {
-          table.wakeParticipant(*it);
+        if (strcmp(pTable.getParticipantStatus(*it), "asleep") == 0) {
+          pTable.wakeParticipant(*it);
           g_table_updated = true;
         }
-        pthread_mutex_unlock(&mtable);
       }
     }
     sleep(5);
@@ -848,7 +835,7 @@ void initialize() {
   
   cout << "Getting my MAC address..." << endl;
   pthread_mutex_unlock(&mtx);
-  FILE *file = fopen("/sys/class/net/eth0/address", "r");
+  FILE *file = fopen("/sys/class/net/wlo1/address", "r");
   i = 0;
   char c_my_mac_addr[16];
   while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -866,7 +853,7 @@ void initialize() {
   for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
     if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
       // TODO: colocar o nome da interface de rede
-      if (strcmp(ifa->ifa_name, "eth0") == 0) {
+      if (strcmp(ifa->ifa_name, "wlo1") == 0) {
         teste = (struct sockaddr_in *) ifa->ifa_addr;
         g_my_ip_addr = inet_ntoa(teste->sin_addr);
       }
@@ -883,7 +870,7 @@ bool isManagerAlive() {
   int socket_fd, ret_value;
   struct sockaddr_in manager_addr{}, from{};
   socklen_t from_len = sizeof(struct sockaddr_in);
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
   
@@ -923,7 +910,7 @@ bool newcommer() {
   ssize_t ret_value;
   struct sockaddr_in broadcast_addr{}, m_address{};
   socklen_t m_address_len = sizeof(struct sockaddr_in);
-  auto *pack = (struct packet *) malloc(sizeof(struct packet));
+  auto *pack = (Packet *) malloc(sizeof(Packet));
   
   // creates manager's discovery socket
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -982,7 +969,7 @@ bool newcommer() {
     return false;
   } else {
     //Manager sent response => There's a manager
-    participant m = parsePayload(pack->payload);
+    Participant m = parsePayload(pack->payload);
     g_manager_hostname = m.hostname;
     g_manager_MAC = m.MAC;
     g_manager_ip = m.IP;

@@ -1,6 +1,6 @@
 #include <netinet/in.h>
 #include <cstdlib> // exit() precisa desse include nos labs do inf
-#include "participantsTable.cpp"
+#include "participantsTable.h"
 
 // -------------------------------------------------- CONSTANTS --------------------------------------------------------
 
@@ -25,15 +25,6 @@
 #define SLEEP_SERVICE_EXIT      "sleep service exit"
 #define SLEEP_STATUS_REQUEST    "sleep status request"
 
-// ------------------------------------------------- STRUCTURES --------------------------------------------------------
-
-struct packet {
-    uint16_t type;              // DATA | CMD
-    uint16_t seqn;              // sequence number
-    uint16_t length;            // payload length
-    char payload[BUFFER_SIZE];// packet data
-};
-
 // -------------------------------------------------- VARIABLES --------------------------------------------------------
 
 // prefixadas com g_ por serem globais e para nao sofrerem shadowing das locais
@@ -41,9 +32,8 @@ int g_sockfd, g_seqn = 1;
 bool g_has_manager = false;
 bool g_table_updated = false;
 struct sockaddr_in g_serv_addr{};
-struct packet *g_pack = (struct packet *) malloc(sizeof(packet));
+Packet *g_pack = (Packet *) malloc(sizeof(Packet));
 pid_t g_my_pid;
 string g_my_hostname, g_my_mac_addr, g_my_ip_addr, g_manager_hostname, g_manager_MAC, g_manager_ip;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mtable = PTHREAD_MUTEX_INITIALIZER;
-participantsTable table;
+ParticipantsTable pTable;

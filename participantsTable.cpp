@@ -1,57 +1,20 @@
-#ifndef PARTICIPANTSTABLE
-#define PARTICIPANTSTABLE
-#include <iostream>
-#include <cstring>
-#include <map>
-#include <list>
-#include <iomanip>
+#include "participantsTable.h"
 
-using namespace std;
-
-struct participant {
-    string hostname;  // Participant hostname
-    string MAC;       // Participant MAC address
-    string IP;        // Participant IP address
-    string status;    // Participant status
-    int pid;        // Participant PID
-};
-
-class participantsTable {
-public:
-    participantsTable() = default;
-
-    std::map<string, participant> table;
-
-    void addParticipant(participant p);
-
-    void deleteParticipant(const string &IPaddress);
-
-    void printTable();
-
-    void sleepParticipant(const string &IPaddress);
-
-    void wakeParticipant(const string &IPAddress);
-
-    std::list<string> getAllParticipantsIP();
-
-    string getParticipantMac(const string &hostname);
-
-    const char* getParticipantStatus(const string &IPAddress);
-
-    bool participantExists(const string &IPaddress);
-};
-
-void participantsTable::addParticipant(participant p) {
+void ParticipantsTable::addParticipant(Participant p) {
     p.status = "awake";
-    table.insert(std::pair<string, participant> (p.IP, p));
+    tableMutex.lock();
+    table.insert({p.IP, p});
+    tableMutex.unlock();
 }
 
-void participantsTable::deleteParticipant(const string &IPaddress) {
+void ParticipantsTable::deleteParticipant(const string &IPaddress) {
+    tableMutex.lock();
     table.erase(IPaddress);
+    tableMutex.unlock();
 }
 
-void participantsTable::printTable() {
-    //system("clear");
+void ParticipantsTable::printTable() {
+    tableMutex.lock();
     cout << std::left;
     cout << "--------------------------------------------------------------------------\n";
     cout << "|Hostname \t|MAC Address      |IP Address     |Status|\n";
@@ -62,46 +25,61 @@ void participantsTable::printTable() {
         cout << "|" << setw(6) << ent.second.status << "|\n";
     }
     cout << "--------------------------------------------------------------------------\n";
+    tableMutex.unlock();
 }
 
-void participantsTable::sleepParticipant(const string &IPAddress) {
+void ParticipantsTable::sleepParticipant(const string &IPAddress) {
+    tableMutex.lock();
     table.at(IPAddress).status = "asleep";
+    tableMutex.unlock();
 }
 
-void participantsTable::wakeParticipant(const string &IPAddress) {
+void ParticipantsTable::wakeParticipant(const string &IPAddress) {
+    tableMutex.lock();
     table.at(IPAddress).status = "awake";
+    tableMutex.unlock();
 }
 
-std::list<string> participantsTable::getAllParticipantsIP() {
+list<string> ParticipantsTable::getAllParticipantsIP() {
+    tableMutex.lock();
     std::list<string> listP = {};
     auto it = listP.begin();
     for (auto &ent: table) {
         listP.insert(it, ent.second.IP);
     }
+    tableMutex.unlock();
     return listP;
 }
 
-string participantsTable::getParticipantMac(const string& hostname) {
+string ParticipantsTable::getParticipantMac(const string& hostname) {
     std::string macaddr = {};
+    tableMutex.lock();
     for (auto &ent: table) {
         if (ent.second.hostname == hostname) {
+            tableMutex.unlock();
             return ent.second.MAC;
         }
     }
+    tableMutex.unlock();
     return "";
 }
 
-const char* participantsTable::getParticipantStatus(const string& IPAddress) {
-    return table.at(IPAddress).status.c_str();
+const char* ParticipantsTable::getParticipantStatus(const string& IPAddress) {
+    tableMutex.lock();
+    const char *status = table.at(IPAddress).status.c_str();
+    tableMutex.unlock();
+    return status;
+
 }
 
-bool participantsTable::participantExists(const string &IPaddress) {
+bool ParticipantsTable::participantExists(const string &IPaddress) {
+    tableMutex.lock();
     for (auto &ent: table) {
         if (ent.second.IP == IPaddress) {
+            tableMutex.unlock();
             return true;
         }
     }
+    tableMutex.unlock();
     return false;
 }
-
-#endif
