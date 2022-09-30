@@ -3,8 +3,6 @@
 #include "participantsTable.h"
 
 // -------------------------------------------------- CONSTANTS --------------------------------------------------------
-
-#define BUFFER_SIZE 128
 #define I_AM_MANAGER 0
 #define I_AM_PARTICIPANT 1
 #define PORT_KEEP_ALIVE 5556
@@ -13,17 +11,6 @@
 #define PORT_DISCOVERY_SERVICE_LISTENER 8001
 #define PORT_MONITORING_SERVICE_BROADCAST 9000
 #define PORT_MONITORING_SERVICE_LISTENER 9001
-#define TYPE_DISCOVERY 1
-#define TYPE_MONITORING 2
-#define TYPE_EXIT 3
-#define TYPE_KEEP_ALIVE 4
-#define TYPE_NEWCOMMER 5
-
-#define KEEP_ALIVE "keep alive"
-#define NEWCOMMER "new commer"
-#define SLEEP_SERVICE_DISCOVERY "sleep service discovery"
-#define SLEEP_SERVICE_EXIT      "sleep service exit"
-#define SLEEP_STATUS_REQUEST    "sleep status request"
 
 // -------------------------------------------------- VARIABLES --------------------------------------------------------
 

@@ -144,7 +144,9 @@ static void *thr_manager_keep_alive(__attribute__((unused)) void *arg) {
 
 static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
   system("clear");
+  pthread_mutex_lock(&mtx);
   pTable.printTable();
+  pthread_mutex_unlock(&mtx);
   
   while (true) {
     if (g_table_updated) {
@@ -457,7 +459,6 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
       cout << "Sendto error." << endl;
       exit(0);
     }
-    pTable.printTable();
     sleep(8);
   }
 }
@@ -991,11 +992,11 @@ int main(int argc, char **argv) {
   
   if (manager_alive) {
     cout << "Initializing Participant..." << endl << endl;
-    sleep(2);
+    sleep(1);
     participant_function();
   } else {
     cout << "Initializing Manager..." << endl << endl;
-    sleep(2);
+    sleep(1);
     manager_function();
   }
   
