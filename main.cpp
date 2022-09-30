@@ -106,12 +106,12 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
     manager_addr.sin_port = (in_port_t) htons(PORT_KEEP_ALIVE_LISTENER);
     manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    while(!g_has_manager);
+    while (!g_has_manager);
 
-    while(true) {
+    while (true) {
         manager_alive = isManagerAlive(sock_fd, manager_addr);
 
-        if(!manager_alive) {
+        if (!manager_alive) {
             cout << "Election!" << endl << endl;
         }
         sleep(4);
@@ -133,29 +133,29 @@ static void *thr_manager_keep_alive(__attribute__((unused)) void *arg) {
 
     bind(sock_fd, (struct sockaddr *) &manager_addr, sizeof(manager_addr));
 
-    while(true) {
+    while (true) {
         recvfrom(sock_fd, pack, sizeof(*pack), 0,
-                    (struct sockaddr *) &from, &from_len);
+                 (struct sockaddr *) &from, &from_len);
 
-        if(!strcmp(pack->payload, KEEP_ALIVE)) {
+        if (!strcmp(pack->payload, KEEP_ALIVE)) {
             pack->type = TYPE_KEEP_ALIVE;
             strcpy(pack->payload, "ACK");
             pack->length = strlen(pack->payload);
 
             sendto(sock_fd, pack, (1024 + sizeof(*pack)), 0,
-                    (struct sockaddr *) &from, sizeof from);
+                   (struct sockaddr *) &from, sizeof from);
         }
     }
 }
 
 static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
-  pthread_mutex_lock(&mtable);
-  system("clear");
-  table.printTable();
-  pthread_mutex_unlock(&mtable);
-  
-    while(true) {
-        if(g_table_updated) {
+    pthread_mutex_lock(&mtable);
+    system("clear");
+    table.printTable();
+    pthread_mutex_unlock(&mtable);
+
+    while (true) {
+        if (g_table_updated) {
             pthread_mutex_lock(&mtx);
             pthread_mutex_lock(&mtable);
             system("clear");
@@ -252,17 +252,9 @@ static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
             continue;
         }
 
-        string message_mac;
-        string message = "\xFF\xFF\xFF\xFF\xFF\xFF";
-        for (int i = 0; i < macaddr.length(); i += 3) {
-            message_mac += static_cast<char>(stoul(macaddr.substr(i, 2), nullptr, 16) & 0xFF);
-        }
-
-        for (int i = 16; i > 0; i--) {
-            message += message_mac;
-        }
-        sendto(sockfd, message.c_str(), message.length(), 0,
-               (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+        string message_mac = "wakeonlan " + macaddr;
+        const char *wake_message = message_mac.c_str();
+        system(wake_message);
     }
 
     pthread_join(thr_table_updater, nullptr);
@@ -309,7 +301,7 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
         exit(0);
     }
 
-    while(true) {
+    while (true) {
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &newcommer_addr, &newcommer_len);
         if (ret_value < 0) {
@@ -317,14 +309,14 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
             exit(0);
         }
 
-        if(!strcmp(pack->payload, NEWCOMMER)) {
+        if (!strcmp(pack->payload, NEWCOMMER)) {
             // send the manager info to the newcommer participant
             string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + to_string(g_my_pid) + ", " + g_my_ip_addr;
             pack->type = TYPE_NEWCOMMER;
             strcpy(pack->payload, s_payload.data());
-            
+
             ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                           (struct sockaddr *) &newcommer_addr, sizeof newcommer_addr);
+                               (struct sockaddr *) &newcommer_addr, sizeof newcommer_addr);
             if (ret_value < 0) {
                 cout << "Sendto error.";
                 exit(0);
@@ -544,7 +536,7 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             pthread_mutex_unlock(&mtable);
         } else {
             participant p = parsePayload(pack->payload);
-            if(!table.participantExists(p.IP)) {
+            if (!table.participantExists(p.IP)) {
                 pthread_mutex_lock(&mtable);
                 table.addParticipant(p);
                 g_table_updated = true;
@@ -725,11 +717,11 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
 
             ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                                  (struct sockaddr *) &p_address, &p_address_len);
-            
+
             if (ret_value < 0) {
                 //Participant doesn't sent response => It's asleep
-                pthread_mutex_lock(&mtable);               
-                if(strcmp(table.getParticipantStatus(*it), "awake") == 0) {
+                pthread_mutex_lock(&mtable);
+                if (strcmp(table.getParticipantStatus(*it), "awake") == 0) {
                     table.sleepParticipant(*it);
                     g_table_updated = true;
                 }
@@ -737,7 +729,7 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
             } else {
                 //Participant sent response => It's awake
                 pthread_mutex_lock(&mtable);
-                if(strcmp(table.getParticipantStatus(*it), "asleep") == 0) {
+                if (strcmp(table.getParticipantStatus(*it), "asleep") == 0) {
                     table.wakeParticipant(*it);
                     g_table_updated = true;
                 }
@@ -776,7 +768,7 @@ static void participant_function() {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
-    
+
     pthread_create(&thr_interface, &attr_interface, &thr_participant_interface_service,
                    nullptr);
     pthread_create(&thr_discovery, &attr_discovery, &thr_participant_discovery_service,
@@ -913,13 +905,13 @@ bool isManagerAlive(int socket_fd, sockaddr_in manager_addr) {
     pack->length = strlen(pack->payload);
 
     ret_value = sendto(socket_fd, pack, (1024 + sizeof(*pack)), 0,
-                        (struct sockaddr *) &manager_addr, sizeof manager_addr);
+                       (struct sockaddr *) &manager_addr, sizeof manager_addr);
 
     ret_value = recvfrom(socket_fd, pack, sizeof(*pack), 0,
-                            (struct sockaddr *) &from, &from_len);
+                         (struct sockaddr *) &from, &from_len);
 
     free(pack);
-    if(ret_value < 0) {
+    if (ret_value < 0) {
         cout << "Time expired [isManagerAlive()]" << endl;
         return false;
     } else {
@@ -960,7 +952,7 @@ bool newcommer() {
     struct timeval timeout{};
     timeout.tv_sec = 3;
     ret_value = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
-    
+
     if (ret_value < 0) {
         cout << "Setsockopt [SO_RCVTIMEO] error." << endl;
         exit(0);
@@ -970,21 +962,21 @@ bool newcommer() {
     broadcast_addr.sin_family = AF_INET;
     broadcast_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_BROADCAST);
     broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-    
+
     pack->type = TYPE_NEWCOMMER;
     strcpy(pack->payload, NEWCOMMER);
     pack->length = strlen(pack->payload);
 
     ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                        (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+                       (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
     if (ret_value < 0) {
         cout << "Sendto error." << endl;
         exit(0);
     }
 
     ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
-                                 (struct sockaddr *) &m_address, &m_address_len);
-            
+                         (struct sockaddr *) &m_address, &m_address_len);
+
     if (ret_value < 0) {
         //Manager doesn't sent response => There's no manager
         cout << "TIMEOUT EXPIRED!" << endl << endl;
@@ -1004,14 +996,14 @@ bool newcommer() {
 int main(int argc, char **argv) {
     signal(SIGINT, signalHandler); // CTRL+C
     signal(SIGHUP, signalHandler); // terminal closed while process still running
-    
+
     bool manager_alive = false;
 
     initialize();
 
     manager_alive = newcommer();
 
-    if(manager_alive) {
+    if (manager_alive) {
         cout << "Initializing Participant..." << endl << endl;
         sleep(2);
         participant_function();
