@@ -12,6 +12,7 @@ using namespace std;
 #include <list>
 #include <iomanip>
 #include <mutex>
+#include <stdlib.h>
 
 typedef struct _participant {
   string hostname;  // Participant hostname
@@ -23,7 +24,7 @@ typedef struct _participant {
 
 class ParticipantsTable {
   map<string, Participant> table;
-
+  int id = 0;
   mutex tableMutex;
 public:
   ParticipantsTable() = default;
@@ -38,7 +39,7 @@ public:
 
   void wakeParticipant(const string &IPAddress);
 
-  list<string> getAllParticipantsIP();
+  list <string> getAllParticipantsIP();
 
   string getParticipantMac(const string &hostname);
 

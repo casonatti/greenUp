@@ -11,6 +11,8 @@
 #define PORT_DISCOVERY_SERVICE_LISTENER 8001
 #define PORT_MONITORING_SERVICE_BROADCAST 9000
 #define PORT_MONITORING_SERVICE_LISTENER 9001
+#define PORT_ELECTION_SERVICE_BROADCAST 9000
+#define PORT_ELECTION_SERVICE_LISTENER 9001
 
 // -------------------------------------------------- VARIABLES --------------------------------------------------------
 

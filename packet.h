@@ -9,11 +9,13 @@
 #include <ctime>
 
 #define BUFFER_SIZE 128
+
 #define TYPE_DISCOVERY 1
 #define TYPE_MONITORING 2
 #define TYPE_EXIT 3
 #define TYPE_KEEP_ALIVE 4
 #define TYPE_NEWCOMMER 5
+#define TYPE_ELECTION 6
 
 #define KEEP_ALIVE "keep alive"
 #define NEWCOMMER "new commer"

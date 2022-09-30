@@ -13,6 +13,7 @@
 #include <cstdlib> // exit() precisa desse include nos labs do inf
 #include <mutex>
 #include "packet.h"
+#include "election.h"
 using namespace std;
 
 // ------------------------------------------------ GLOBAL VAR section -------------------------------------------------
@@ -756,6 +757,7 @@ static void participant_function() {
                  nullptr);
   pthread_create(&thr_monitoring, &attr_monitoring, &thr_participant_monitoring_service,
                  nullptr);
+  Election::startElectionThread();
   pthread_create(&thr_keep_alive, &attr_keep_alive, &thr_participant_keep_alive_monitoring,
                  nullptr);
   
