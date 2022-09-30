@@ -98,13 +98,6 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
   int sock_fd;
   bool manager_alive = false;
   ssize_t ret_value;
-  struct sockaddr_in manager_addr{};
-  
-  sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
-  
-  manager_addr.sin_family = AF_INET;
-  manager_addr.sin_port = (in_port_t) htons(PORT_KEEP_ALIVE_LISTENER);
-  manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
   
   while (!g_has_manager);
   
@@ -888,7 +881,7 @@ void initialize() {
 
 bool isManagerAlive() {
   int socket_fd, ret_value;
-  struct sockaddr_in from{};
+  struct sockaddr_in manager_addr{}, from{};
   socklen_t from_len = sizeof(struct sockaddr_in);
   auto *pack = (struct packet *) malloc(sizeof(struct packet));
   
@@ -903,12 +896,15 @@ bool isManagerAlive() {
     exit(0);
   }
   
+  manager_addr = g_serv_addr;
+  manager_addr.sin_port = (in_port_t) htons(PORT_KEEP_ALIVE_LISTENER);
+  
   pack->type = TYPE_KEEP_ALIVE;
   strcpy(pack->payload, KEEP_ALIVE);
   pack->length = strlen(pack->payload);
   
   ret_value = sendto(socket_fd, pack, (1024 + sizeof(*pack)), 0,
-                     (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
+                     (struct sockaddr *) &manager_addr, sizeof manager_addr);
   
   ret_value = recvfrom(socket_fd, pack, sizeof(*pack), 0,
                        (struct sockaddr *) &from, &from_len);
