@@ -19,7 +19,7 @@ using namespace std;
 
 class Election {
   ssize_t ret_value;
-  static inline int listenerSockfd, broadcastSockfd;
+  static inline int sockfd;
   static inline struct sockaddr_in listenerAddr, broadcastAddr;
 public:
   static inline int result;

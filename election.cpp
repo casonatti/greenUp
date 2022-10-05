@@ -19,7 +19,7 @@ void Election::monitorElection() {
 
     while (true) {
         cout << "Election monitor created\n";
-        ret_value = recvfrom(listenerSockfd, pack, sizeof(*pack), MSG_WAITALL,
+        ret_value = recvfrom(sockfd, pack, sizeof(*pack), MSG_WAITALL,
                              (struct sockaddr *) &from, &from_len);
         cout << "Received packet: " << pack->payload << endl;
 
@@ -27,7 +27,7 @@ void Election::monitorElection() {
             alreadyJoined = true;
             strcpy(pack->payload, ELECTION_ANSWER);
             pack->seqn++;
-            ret_value = sendto(listenerSockfd, pack, (1024 + sizeof(*pack)), MSG_CONFIRM,
+            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), MSG_CONFIRM,
                                (struct sockaddr *) &from, sizeof from_len);
             result = 0;
             thread th1(startElection);
@@ -44,8 +44,8 @@ void Election::monitorElection() {
 
                 struct timeval timeout{};
                 timeout.tv_sec = 5;
-                setsockopt(listenerSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
-                ret_value = recvfrom(listenerSockfd, pack, sizeof(*pack), MSG_WAITALL,
+                setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+                ret_value = recvfrom(sockfd, pack, sizeof(*pack), MSG_WAITALL,
                                      (struct sockaddr *) &from, &from_len);
 
             }
@@ -57,11 +57,10 @@ void Election::monitorElection() {
 }
 
 void Election::startElectionThread() {
-    listenerSockfd = Communication::createSocket();
-    listenerAddr = Communication::bindSocket(listenerSockfd, PORT_ELECTION_SERVICE_LISTENER);
+    sockfd = Communication::createSocket();
+    listenerAddr = Communication::bindSocket(sockfd, PORT_ELECTION_SERVICE_LISTENER);
 
-    broadcastSockfd = Communication::createSocket();
-    broadcastAddr = Communication::bindSocket(broadcastSockfd, PORT_ELECTION_SERVICE_BROADCAST);
+    broadcastAddr = Communication::createBroadcastAddress(PORT_ELECTION_SERVICE_BROADCAST);
     thread th1(monitorElection);
     th1.join();
 }
@@ -74,8 +73,9 @@ void Election::startElection() {
     socklen_t to_len = sizeof(struct sockaddr_in);
     Packet *pack = (Packet *) malloc(sizeof(Packet));
 
+    to = Communication::createBroadcastAddress(PORT_ELECTION_SERVICE_BROADCAST);
     strcpy(pack->payload, ELECTION_MESSAGE);
-    pTable.printTable();
+
     myPid = pTable.getParticipantPid(g_my_hostname);
     list<string> listIP = pTable.getBiggerParticipantsIP(myPid);
 
@@ -83,7 +83,7 @@ void Election::startElection() {
 
     for (it = listIP.begin(); it != listIP.end(); ++it) {
         inet_aton(it->c_str(), (in_addr *) &to.sin_addr.s_addr);
-        ret_value = sendto(broadcastSockfd, pack, (1024 + sizeof(pack)), MSG_CONFIRM,
+        ret_value = sendto(sockfd, pack, (1024 + sizeof(pack)), MSG_CONFIRM,
                            (struct sockaddr *) &to, to_len);
         if (ret_value < 0) {
             cout << "Sendto error." << endl;
@@ -92,7 +92,7 @@ void Election::startElection() {
     }
     while(i < listIP.size()){
         sleep(1);
-        ret_value = recvfrom(broadcastSockfd, pack, sizeof(*pack), MSG_DONTWAIT,
+        ret_value = recvfrom(sockfd, pack, sizeof(*pack), MSG_DONTWAIT,
                              (struct sockaddr *) &from, &to_len);
         if(strcmp(pack->payload, ELECTION_ANSWER) == 0) {
             result = -1;
@@ -105,7 +105,21 @@ void Election::startElection() {
 }
 
 void Election::sendCoordinator(){
-    return;
+
+    bool alreadyJoined = false;
+    int ret_value, len, myPid, i = 0;
+    struct sockaddr_in to{}, from{};
+    socklen_t to_len = sizeof(struct sockaddr_in);
+    Packet *pack = (Packet *) malloc(sizeof(Packet));
+
+    string load = g_my_hostname + ", " + g_my_mac_addr + ", " + g_my_ip_addr;
+    strcpy(pack->payload, load.c_str());
+    pack->type = TYPE_ELECTION;
+    pack->seqn =  0;
+    cout <<  "sending coordinator\n";
+    ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                       (struct sockaddr *) &broadcastAddr, sizeof broadcastAddr);
+    cout <<  "coordinator message sent :" <<  pack->payload << endl;
 }
 
 bool Election::isManagerAlive() {
