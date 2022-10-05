@@ -12,15 +12,15 @@
 #include <unistd.h>
 #include <cstdlib> // exit() precisa desse include nos labs do inf
 #include <mutex>
-#include "election.h"
 #include "packet.h"
+#include "election.h"
+
 
 using namespace std;
 
 // ------------------------------------------------ GLOBAL VAR section -------------------------------------------------
 
 #include "globals.cpp"
-
 
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -104,14 +104,29 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
   while (!g_has_manager);
   
   while (true) {
+      cout << "testando manager alive\n";
     manager_alive = isManagerAlive();
-    
+      cout << "sai do is manager alive\n";
     if (!manager_alive) {
-      cout << "Election!" << endl << endl;
+        cout << "Election!" << endl << endl;
+        thread th1(Election::startElection);
 
+        while (Election::result == 0) {
+        }
+        cout << "result changed!" << Election::result << endl;
+        if (Election::result == 1) {
+            cout << "vou ser o novo manager!";
+            Election::sendCoordinator();
+        } else {
+            cout << "vou esperar o novo manager se pronunciar";
+
+            struct timeval timeout{};
+            timeout.tv_sec = 5;
+
+        }
     }
-
     sleep(4);
+
   }
 }
 
@@ -761,6 +776,7 @@ static void participant_function() {
                  nullptr);
   pthread_create(&thr_keep_alive, &attr_keep_alive, &thr_participant_keep_alive_monitoring,
                  nullptr);
+  Election::startElectionThread();
   
   pthread_join(thr_interface, nullptr);
   pthread_join(thr_discovery, nullptr);

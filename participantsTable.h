@@ -12,7 +12,7 @@ using namespace std;
 #include <list>
 #include <iomanip>
 #include <mutex>
-#include <stdlib.h>
+#include <cstdlib>
 
 typedef struct _participant {
   string hostname;  // Participant hostname
@@ -41,7 +41,11 @@ public:
 
   list <string> getAllParticipantsIP();
 
+  list <string> getBiggerParticipantsIP(int pid);
+
   string getParticipantMac(const string &hostname);
+
+  int getParticipantPid(const string &hostname);
 
   const char *getParticipantStatus(const string &IPAddress);
 

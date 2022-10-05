@@ -20,8 +20,9 @@ int g_sockfd, g_seqn = 1;
 bool g_has_manager = false;
 bool g_table_updated = false;
 struct sockaddr_in g_serv_addr{};
+string g_my_hostname, g_my_mac_addr, g_my_ip_addr, g_manager_hostname, g_manager_MAC, g_manager_ip;
+ParticipantsTable pTable;
+
 Packet *g_pack = (Packet *) malloc(sizeof(Packet));
 pid_t g_my_pid;
-string g_my_hostname, g_my_mac_addr, g_my_ip_addr, g_manager_hostname, g_manager_MAC, g_manager_ip;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-ParticipantsTable pTable;

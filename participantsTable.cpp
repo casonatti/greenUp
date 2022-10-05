@@ -53,6 +53,18 @@ list <string> ParticipantsTable::getAllParticipantsIP() {
     return listP;
 }
 
+list <string> ParticipantsTable::getBiggerParticipantsIP(int pid) {
+    tableMutex.lock();
+    std::list<string> listP = {};
+    auto it = listP.begin();
+    for (auto &ent: table) {
+        if (ent.second.pid > pid)
+            listP.insert(it, ent.second.IP);
+    }
+    tableMutex.unlock();
+    return listP;
+}
+
 string ParticipantsTable::getParticipantMac(const string &hostname) {
     std::string macaddr = {};
     tableMutex.lock();
@@ -64,6 +76,19 @@ string ParticipantsTable::getParticipantMac(const string &hostname) {
     }
     tableMutex.unlock();
     return "";
+}
+
+int ParticipantsTable::getParticipantPid(const string &hostname){
+    int pid;
+    tableMutex.lock();
+    for (auto &ent: table) {
+        if (ent.second.hostname == hostname) {
+            tableMutex.unlock();
+            return ent.second.pid;
+        }
+    }
+    tableMutex.unlock();
+    return -1;
 }
 
 const char *ParticipantsTable::getParticipantStatus(const string &IPAddress) {

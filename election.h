@@ -13,18 +13,25 @@
 #include <arpa/inet.h>
 #include <thread>
 #include "communication.h"
+#include "globals.h"
 
 using namespace std;
 
 class Election {
-    ssize_t ret_value;
-    static int socketfd;
+  ssize_t ret_value;
+  static inline int listenerSockfd, broadcastSockfd;
+  static inline struct sockaddr_in listenerAddr, broadcastAddr;
 public:
+  static inline int result;
+
   static void monitorElection();
 
   static void startElectionThread();
-  static bool startElection();
+
+  static void startElection();
+
   static void sendCoordinator();
+
   static bool isManagerAlive();
 };
 
