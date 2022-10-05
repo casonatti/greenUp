@@ -25,8 +25,8 @@
 
 typedef struct _packet {
   uint16_t type;              // DATA | CMD
-  uint16_t seqn;              // sequence number
   uint16_t length;            // payload length
+  uint16_t seqn;              // sequence number
   char payload[BUFFER_SIZE];// packet data
 } Packet;
 

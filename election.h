@@ -6,23 +6,26 @@
 #define GREENUP_ELECTION_H
 
 #include <string>
-#include <string.h>
+#include <cstring>
 #include <list>
 #include "packet.h"
 #include "participantsTable.h"
 #include <arpa/inet.h>
 #include <thread>
-#include "globals.cpp"
+#include "communication.h"
 
 using namespace std;
 
 class Election {
-
+    ssize_t ret_value;
+    static int socketfd;
 public:
   static void monitorElection();
 
   static void startElectionThread();
-  //static void sendElectionMessage(ParticipantsTable table, string message);
+  static bool startElection();
+  static void sendCoordinator();
+  static bool isManagerAlive();
 };
 
 #endif //GREENUP_ELECTION_H
