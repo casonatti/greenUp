@@ -24,6 +24,7 @@ void Election::monitorElection() {
         if (strcmp(pack->payload, ELECTION_MESSAGE) == 0) {
             alreadyJoined = true;
             strcpy(pack->payload, ELECTION_ANSWER);
+            cout << "vou enviar answer: " << pack->payload << endl;
             pack->seqn++;
             ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), MSG_CONFIRM,
                                (struct sockaddr *) &from, sizeof from_len);
@@ -77,8 +78,13 @@ void Election::startElection() {
     to = Communication::createBroadcastAddress(PORT_ELECTION_SERVICE_BROADCAST);
     strcpy(pack->payload, ELECTION_MESSAGE);
 
-    myPid = pTable.getParticipantPid(g_my_hostname);
+    myPid = pTable.getParticipantPid(g_my_ip_addr);
+    cout << "election my pid: " << myPid << endl;
     list<string> listIP = pTable.getBiggerParticipantsIP(myPid);
+    cout << "election ip list: ";
+    for(string item : listIP) 
+        cout << item << " ";
+    cout << endl;
 
     list<string>::iterator it;
 
@@ -90,6 +96,7 @@ void Election::startElection() {
             cout << "Sendto error." << endl;
             exit(0);
         }
+        cout << "election message sent to id: " << it->c_str() << "and address: " << inet_ntoa(to.sin_addr) << endl;
     }
     while(i < listIP.size()){
         sleep(1);
@@ -100,8 +107,10 @@ void Election::startElection() {
             return;
         }
         i++;
+        cout << "election answer received from id: " << inet_ntoa(from.sin_addr) << endl;
     }
     cout << "Sai do startelection " << endl;
+    sleep(100);
     result = 1;
     return;
 }

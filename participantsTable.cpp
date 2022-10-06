@@ -1,7 +1,6 @@
 #include "participantsTable.h"
 
 ParticipantsTable::ParticipantsTable(string message){
-    cout << "entrei no constructor\n";
     std::string s;
     std::string columnDelimiter = ",";
     string lineDelimiter = ";";
@@ -16,12 +15,8 @@ ParticipantsTable::ParticipantsTable(string message){
 
     while ((line = s.find(lineDelimiter)) != std::string::npos) {
         lineToken = s.substr(0, line);
-        cout << "line token: " << lineToken << endl;
         while ((column = lineToken.find(columnDelimiter)) != std::string::npos) {
-            cout << column << endl;
             fieldToken = lineToken.substr(0, column);
-            cout << "field token: "<< fieldToken << endl;
-            sleep(1);
             switch (i) {
                 case 0:
                     p.hostname = fieldToken;
@@ -41,9 +36,7 @@ ParticipantsTable::ParticipantsTable(string message){
             lineToken.erase(0, column + columnDelimiter.length());
             i++;
         }
-        cout << "field token: "<< lineToken << endl;
         p.pid = stoi(lineToken);
-        cout << "inserting line: " << p.IP;
         table.insert({p.IP, p});
         s.erase(0, line + lineDelimiter.length());
         i = 0;
@@ -129,11 +122,11 @@ string ParticipantsTable::getParticipantMac(const string &hostname) {
     return "";
 }
 
-int ParticipantsTable::getParticipantPid(const string &hostname){
+int ParticipantsTable::getParticipantPid(const string &ip){
     int pid;
     tableMutex.lock();
     for (auto &ent: table) {
-        if (ent.second.hostname == hostname) {
+        if (ent.second.IP == ip) {
             tableMutex.unlock();
             return ent.second.pid;
         }
@@ -168,6 +161,50 @@ string ParticipantsTable::parseTostring(){
         message = message + ent.second.hostname + "," + ent.second.MAC + "," + ent.second.IP + "," + ent.second.status + "," + to_string(ent.second.pid) + ";";
     }
     tableMutex.unlock();
+    message = message + to_string(id);
     return message;
 }
 
+void ParticipantsTable::updateTable(string s) {
+    table.clear();
+    std::string columnDelimiter = ",";
+    string lineDelimiter = ";";
+    Participant p;
+    int i = 0;
+
+    size_t column = 0;
+    size_t line = 0;
+    string lineToken;
+    string fieldToken;
+
+    while ((line = s.find(lineDelimiter)) != std::string::npos) {
+        lineToken = s.substr(0, line);
+        while ((column = lineToken.find(columnDelimiter)) != std::string::npos) {
+            fieldToken = lineToken.substr(0, column);
+            switch (i) {
+                case 0:
+                    p.hostname = fieldToken;
+                    break;
+                case 1:
+                    p.MAC = fieldToken;
+                    break;
+                case 2:
+                    p.IP = fieldToken;
+                    break;
+                case 3:
+                    p.status = fieldToken;
+                    break;
+                default:
+                    break;
+            }
+            lineToken.erase(0, column + columnDelimiter.length());
+            i++;
+        }
+        p.pid = stoi(lineToken);
+        table.insert({p.IP, p});
+        s.erase(0, line + lineDelimiter.length());
+        i = 0;
+    }
+    id = stoi(s);
+    printTable();
+}

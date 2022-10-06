@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include <ctime>
 
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 1024
 
 #define TYPE_DISCOVERY 1
 #define TYPE_MONITORING 2

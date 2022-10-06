@@ -116,7 +116,7 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
             thread th1(Election::startElection);
 
             while (Election::result == 0) {
-                cout << "aguardando resultado eleicao\n";
+                // cout << "aguardando resultado eleicao\n";
                 sleep(1);
             }
             th1.join();
@@ -130,6 +130,7 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
                 pthread_cancel(thr_discovery);
                 pthread_cancel(thr_monitoring);
                 pthread_cancel(thr_interface);
+                pthread_cancel(thr_table_update);
                 char* ret; 
                 ret = strdup("exit");
                 pthread_exit(ret);
@@ -174,6 +175,39 @@ static void *thr_manager_keep_alive(__attribute__((unused)) void *arg) {
 }
 
 static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
+    int sockfd, true_flag = true;
+    ssize_t ret_value;
+    struct sockaddr_in broadcast_addr{}, m_address{};
+    socklen_t m_address_len = sizeof(struct sockaddr_in);
+    auto *pack = (Packet *) malloc(sizeof(Packet));
+
+    // creates manager's discovery socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        cout << "Socket creation error";
+        exit(0);
+    }
+
+    // set socket options broadcast and reuseaddr to true
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_BROADCAST] error." << endl;
+        exit(0);
+    }
+
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_REUSEADDR] error." << endl;
+        exit(0);
+    }
+
+    // configure manager's discovery broadcast address
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = (in_port_t) htons(PORT_TABLE_UPDATE);
+    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
     system("clear");
     pthread_mutex_lock(&mtx);
     pTable.printTable();
@@ -186,6 +220,16 @@ static void *thr_manager_table_updater(__attribute__((unused)) void *arg) {
             pTable.printTable();
             g_table_updated = false;
             pthread_mutex_unlock(&mtx);
+
+            strcpy(pack->payload, pTable.parseTostring().data());
+            cout << "updating table. message to send: " << pack->payload << endl;
+            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                               (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+            if (ret_value < 0) {
+                cout << "Sendto error.";
+                cout << "Bind socket error: " << strerror(errno) << endl;
+                exit(0);
+            }
         }
     }
 }
@@ -315,7 +359,7 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
 
     // configure manager's discovery broadcast address
     broadcast_addr.sin_family = AF_INET;
-    broadcast_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_BROADCAST);
+    broadcast_addr.sin_port = (in_port_t) htons(PORT_NEWCOMMER);
     broadcast_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     // bind the participant's discovery socket to the listening port
@@ -333,6 +377,7 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
             exit(0);
         }
 
+        
         if (!strcmp(pack->payload, NEWCOMMER)) {
             // send the manager info to the newcommer participant
             string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + to_string(g_my_pid) + ", " + g_my_ip_addr;
@@ -340,18 +385,83 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
             strcpy(pack->payload, s_payload.data());
 
             ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                               (struct sockaddr *) &newcommer_addr, sizeof newcommer_addr);
+                                (struct sockaddr *) &newcommer_addr, sizeof newcommer_addr);
             if (ret_value < 0) {
                 cout << "Sendto error.";
                 exit(0);
             }
 
             // send the list of all participants to the newcommer participant (for bully algorithm)
-            list<string> all_participants = pTable.getAllParticipantsIP();
-
-            // pack->payload = all_participants;
+            sleep(1);
+            strcpy(pack->payload, pTable.parseTostring().data());
+            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                               (struct sockaddr *) &newcommer_addr, sizeof newcommer_addr);
+            if (ret_value < 0) {
+                cout << "Sendto error.";
+                exit(0);
+            }
+            cout << "sent newcommer table message: " << pack->payload << endl;
         }
     }
+}
+
+static void *thr_participant_table_update_service(__attribute__((unused)) void *arg) {
+    int sockfd, true_flag = true;
+    ssize_t ret_value;
+    socklen_t updater_len = sizeof(struct sockaddr_in);
+    struct sockaddr_in broadcast_addr{}, updater_addr;
+    auto *pack = (Packet *) malloc(sizeof(Packet));
+
+    // creates participant's discovery socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        cout << "Socket creation error";
+        exit(0);
+    }
+
+    // set socket options broadcast and reuseaddr to true
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_BROADCAST] error." << endl;
+        exit(0);
+    }
+
+    ret_value = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &true_flag,
+                           sizeof(true_flag));
+    if (ret_value < 0) {
+        cout << "Setsockopt [SO_REUSEADDR] error." << endl;
+        exit(0);
+    }
+
+    // configure manager's discovery broadcast address
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = (in_port_t) htons(PORT_TABLE_UPDATE);
+    broadcast_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    // bind the participant's discovery socket to the listening port
+    ret_value = bind(sockfd, (struct sockaddr *) &broadcast_addr, sizeof broadcast_addr);
+    if (ret_value < 0) {
+        cout << "Bind socket error." << endl;
+        exit(0);
+    }
+
+    while (!is_manager) {
+        ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
+                             (struct sockaddr *) &updater_addr, &updater_len);
+        if (ret_value < 0) {
+            cout << "Recvfrom error.";
+            exit(0);
+        }
+
+        // update the table
+        cout << "updating table: " << pack->payload << endl;
+        pTable.updateTable(pack->payload);
+    }
+    cout << "Vou sair da update table" << endl;
+    char* ret; 
+    ret = strdup("exit");
+    pthread_exit(ret);
 }
 
 static void *thr_participant_discovery_service(__attribute__((unused)) void *arg) {
@@ -786,6 +896,11 @@ static void participant_function() {
         cout << "Pthread_attr_init error." << endl;
         exit(0);
     }
+    ret_value = pthread_attr_init(&attr_table_update);
+    if (ret_value != 0) {
+        cout << "Pthread_attr_init error." << endl;
+        exit(0);
+    }
 
     pthread_create(&thr_interface, &attr_interface, &thr_participant_interface_service,
                    nullptr);
@@ -795,12 +910,15 @@ static void participant_function() {
                    nullptr);
     pthread_create(&thr_keep_alive, &attr_keep_alive, &thr_participant_keep_alive_monitoring,
                    nullptr);
+    pthread_create(&thr_table_update, &attr_table_update, &thr_participant_table_update_service,
+                   nullptr);
     Election::startElectionThread();
 
     pthread_join(thr_interface, nullptr);
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
     pthread_join(thr_keep_alive, nullptr);
+    pthread_join(thr_table_update, nullptr);
 
     if(is_manager){
         cout << "Entrei no if do is_manager" << endl;
@@ -955,6 +1073,7 @@ bool newcommer() {
     struct sockaddr_in broadcast_addr{}, m_address{};
     socklen_t m_address_len = sizeof(struct sockaddr_in);
     auto *pack = (Packet *) malloc(sizeof(Packet));
+    auto *pack2 = (Packet *) malloc(sizeof(Packet));
 
     // creates manager's discovery socket
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -990,7 +1109,7 @@ bool newcommer() {
 
     // configure manager's discovery broadcast address
     broadcast_addr.sin_family = AF_INET;
-    broadcast_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_BROADCAST);
+    broadcast_addr.sin_port = (in_port_t) htons(PORT_NEWCOMMER);
     broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
     pack->type = TYPE_NEWCOMMER;
@@ -1012,11 +1131,23 @@ bool newcommer() {
         cout << "TIMEOUT EXPIRED!" << endl << endl;
         return false;
     } else {
+        cout << "newcommer participant getting manager info" << endl;
+        cout << "newcommer manager info: " << pack->payload << endl;
         //Manager sent response => There's a manager
         Participant m = parsePayload(pack->payload);
         g_manager_hostname = m.hostname;
         g_manager_MAC = m.MAC;
         g_manager_ip = m.IP;
+
+        cout << "newcommer participant getting table from manager" << endl;
+        ret_value = recvfrom(sockfd, pack2, sizeof(*pack2), 0,
+                            (struct sockaddr *) &m_address, &m_address_len);
+        if (ret_value < 0) {
+            cout << "recvfrom error" << endl;
+            exit(0);
+        }
+
+        pTable.updateTable(pack2->payload);
         return true;
     }
 }

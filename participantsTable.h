@@ -55,6 +55,8 @@ public:
 
   string parseTostring();
 
+  void updateTable(string s);
+
 };
 
 #endif //GREENUP_USERSTABLE_H
