@@ -19,10 +19,10 @@ using namespace std;
 
 class Election {
   ssize_t ret_value;
-  static inline int sockfd;
-  static inline struct sockaddr_in listenerAddr, broadcastAddr;
+  static int sockfd;
+  static struct sockaddr_in listenerAddr, broadcastAddr;
 public:
-  static inline int result;
+  static int result;
 
   static void monitorElection();
 
@@ -35,4 +35,7 @@ public:
   static bool isManagerAlive();
 };
 
+
 #endif //GREENUP_ELECTION_H
+
+

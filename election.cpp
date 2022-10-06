@@ -10,6 +10,11 @@
 #define PORT_ELECTION_SERVICE_BROADCAST 10000
 #define PORT_ELECTION_SERVICE_LISTENER 10001
 
+	int Election::sockfd = 0;
+	struct sockaddr_in Election::listenerAddr;
+	struct sockaddr_in Election::broadcastAddr;
+	int Election::result;
+
 void Election::monitorElection() {
     bool alreadyJoined = false;
     int ret_value, len;
