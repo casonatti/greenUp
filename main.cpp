@@ -24,6 +24,7 @@ using namespace std;
 // ---------------------------------------------------------------------------------------------------------------------
 
 bool isManagerAlive();
+static void manager_function();
 
 void signalHandler(int signum) {
     g_pack->type = TYPE_EXIT;
@@ -77,7 +78,7 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
         exit(0);
     }
 
-    while (true) {
+    while (!is_manager) {
         cin.getline(buffer, 32);
         if (strcmp(buffer, "EXIT") == 0) {
             pthread_mutex_lock(&mtx);
@@ -93,6 +94,10 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
             exit(0);
         }
     }
+    cout << "Vou sair da participant_interface" << endl;
+    char* ret; 
+    ret = strdup("exit");
+    pthread_exit(ret);
 }
 
 static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void *arg) {
@@ -120,6 +125,14 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
                 cout << "vou ser o novo manager!";
                 Election::sendCoordinator();
                 cout << "Tenho que parar de ser participant e virar manager\n";
+                is_manager = true;
+                cout << "Vou sair da keep_alive" << endl;
+                pthread_cancel(thr_discovery);
+                pthread_cancel(thr_monitoring);
+                pthread_cancel(thr_interface);
+                char* ret; 
+                ret = strdup("exit");
+                pthread_exit(ret);
             } else {
                 cout << "vou esperar o novo manager se pronunciar";
             }
@@ -239,6 +252,7 @@ static void *thr_manager_interface_service(__attribute__((unused)) void *arg) {
 
     while (true) {
         char buffer[32];
+        std::cin.clear();
         cin.getline(buffer, 32);
         stringstream stream(buffer);
 
@@ -381,7 +395,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
         exit(0);
     }
 
-    while (true) {
+    while (!is_manager) {
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
         if (ret_value < 0) {
@@ -415,6 +429,10 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             exit(0);
         }
     }
+    cout << "Vou sair da discovery" << endl;
+    char* ret; 
+    ret = strdup("exit");
+    pthread_exit(ret);
 }
 
 static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg) {
@@ -622,7 +640,7 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
         exit(0);
     }
 
-    while (true) {
+    while (!is_manager) {
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
         if (ret_value < 0) {
@@ -642,6 +660,10 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             exit(0);
         }
     }
+    cout << "Vou sair da monitoring" << endl;
+    char* ret; 
+    ret = strdup("exit");
+    pthread_exit(ret);
 }
 
 static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
@@ -744,9 +766,6 @@ static void participant_function() {
 
     // ---------------------------------------------- SUBSERVICES ------------------------------------------------------
 
-    pthread_t thr_discovery, thr_monitoring, thr_interface, thr_keep_alive;
-    pthread_attr_t attr_discovery, attr_monitoring, attr_interface, attr_keep_alive;
-
     ret_value = pthread_attr_init(&attr_discovery);
     if (ret_value != 0) {
         cout << "Pthread_attr_init error." << endl;
@@ -781,8 +800,12 @@ static void participant_function() {
     pthread_join(thr_interface, nullptr);
     pthread_join(thr_discovery, nullptr);
     pthread_join(thr_monitoring, nullptr);
-    pthread_join(thr_monitoring, nullptr);
     pthread_join(thr_keep_alive, nullptr);
+
+    if(is_manager){
+        cout << "Entrei no if do is_manager" << endl;
+        manager_function();
+    }
 }
 
 static void manager_function() {
@@ -792,6 +815,7 @@ static void manager_function() {
     ssize_t ret_value;
     pthread_t thr_discovery, thr_monitoring, thr_interface, thr_manager_newcommer, thr_keep_alive;
     pthread_attr_t attr_discovery, attr_monitoring, attr_interface, attr_newcommer, attr_keep_alive;
+    is_manager = true;
 
     ret_value = pthread_attr_init(&attr_discovery);
     if (ret_value != 0) {
@@ -855,7 +879,7 @@ void initialize() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
+    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -873,7 +897,7 @@ void initialize() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
+            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 g_my_ip_addr = inet_ntoa(teste->sin_addr);
             }

@@ -17,11 +17,9 @@ void Election::monitorElection() {
     socklen_t from_len = sizeof(struct sockaddr_in);
     Packet *pack = (Packet *) malloc(sizeof(Packet));
 
-    while (true) {
-        cout << "Election monitor created\n";
-        ret_value = recvfrom(sockfd, pack, sizeof(*pack), MSG_WAITALL,
+    while (!is_manager) {
+        ret_value = recvfrom(sockfd, pack, sizeof(*pack), MSG_DONTWAIT,
                              (struct sockaddr *) &from, &from_len);
-        cout << "Received packet: " << pack->payload << endl;
 
         if (strcmp(pack->payload, ELECTION_MESSAGE) == 0) {
             alreadyJoined = true;
@@ -53,6 +51,9 @@ void Election::monitorElection() {
 
         }
     }
+    char* ret; 
+    ret = strdup("exit");
+    pthread_exit(ret);
 
 }
 
@@ -84,7 +85,7 @@ void Election::startElection() {
     for (it = listIP.begin(); it != listIP.end(); ++it) {
         inet_aton(it->c_str(), (in_addr *) &to.sin_addr.s_addr);
         ret_value = sendto(sockfd, pack, (1024 + sizeof(pack)), MSG_CONFIRM,
-                           (struct sockaddr *) &to, to_len);
+                           (struct sockaddr *) &to, to_len);                  
         if (ret_value < 0) {
             cout << "Sendto error." << endl;
             exit(0);
@@ -100,6 +101,7 @@ void Election::startElection() {
         }
         i++;
     }
+    cout << "Sai do startelection " << endl;
     result = 1;
     return;
 }
