@@ -13,6 +13,7 @@ using namespace std;
 #include <iomanip>
 #include <mutex>
 #include <cstdlib>
+#include <unistd.h>
 
 typedef struct _participant {
   string hostname;  // Participant hostname
@@ -27,6 +28,7 @@ class ParticipantsTable {
   int id = 0;
   mutex tableMutex;
 public:
+  ParticipantsTable (string message);
   ParticipantsTable() = default;
 
   void addParticipant(Participant p);
@@ -50,6 +52,9 @@ public:
   const char *getParticipantStatus(const string &IPAddress);
 
   bool participantExists(const string &IPaddress);
+
+  string parseTostring();
+
 };
 
 #endif //GREENUP_USERSTABLE_H

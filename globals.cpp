@@ -22,7 +22,7 @@ bool g_has_manager = false;
 bool g_table_updated = false;
 struct sockaddr_in g_serv_addr{};
 string g_my_hostname, g_my_mac_addr, g_my_ip_addr, g_manager_hostname, g_manager_MAC, g_manager_ip;
-ParticipantsTable pTable;
+ParticipantsTable pTable("hostname1,mac1,ip1,status1,1;hostname2,mac2,ip2,status2,2;");
 pthread_t thr_discovery, thr_monitoring, thr_interface, thr_keep_alive;
 pthread_attr_t attr_discovery, attr_monitoring, attr_interface, attr_keep_alive;
 

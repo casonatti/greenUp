@@ -1,5 +1,56 @@
 #include "participantsTable.h"
 
+ParticipantsTable::ParticipantsTable(string message){
+    cout << "entrei no constructor\n";
+    std::string s;
+    std::string columnDelimiter = ",";
+    string lineDelimiter = ";";
+    Participant p;
+    int i = 0;
+
+    s = message;
+    size_t column = 0;
+    size_t line = 0;
+    string lineToken;
+    string fieldToken;
+
+    while ((line = s.find(lineDelimiter)) != std::string::npos) {
+        lineToken = s.substr(0, line);
+        cout << "line token: " << lineToken << endl;
+        while ((column = lineToken.find(columnDelimiter)) != std::string::npos) {
+            cout << column << endl;
+            fieldToken = lineToken.substr(0, column);
+            cout << "field token: "<< fieldToken << endl;
+            sleep(1);
+            switch (i) {
+                case 0:
+                    p.hostname = fieldToken;
+                    break;
+                case 1:
+                    p.MAC = fieldToken;
+                    break;
+                case 2:
+                    p.IP = fieldToken;
+                    break;
+                case 3:
+                    p.status = fieldToken;
+                    break;
+                default:
+                    break;
+            }
+            lineToken.erase(0, column + columnDelimiter.length());
+            i++;
+        }
+        cout << "field token: "<< lineToken << endl;
+        p.pid = stoi(lineToken);
+        cout << "inserting line: " << p.IP;
+        table.insert({p.IP, p});
+        s.erase(0, line + lineDelimiter.length());
+        i = 0;
+    }
+    printTable();
+}
+
 void ParticipantsTable::addParticipant(Participant p) {
     p.status = "awake";
     tableMutex.lock();
@@ -109,3 +160,14 @@ bool ParticipantsTable::participantExists(const string &IPaddress) {
     tableMutex.unlock();
     return false;
 }
+
+string ParticipantsTable::parseTostring(){
+    string message = "";
+    tableMutex.lock();
+    for (auto &ent: table) {
+        message = message + ent.second.hostname + "," + ent.second.MAC + "," + ent.second.IP + "," + ent.second.status + "," + to_string(ent.second.pid) + ";";
+    }
+    tableMutex.unlock();
+    return message;
+}
+
