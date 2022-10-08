@@ -24,7 +24,7 @@ void Election::monitorElection() {
     int ret_value, len;
     struct sockaddr_in from{};
     char buffer[256];
-    socklen_t from_len = sizeof(struct sockaddr_in);
+    socklen_t from_len = sizeof(from);
     Packet *pack = (Packet *) malloc(sizeof(Packet));
 
     while (!is_manager) {
@@ -41,8 +41,8 @@ void Election::monitorElection() {
             strcpy(pack->payload, ELECTION_ANSWER);
             cout << "vou enviar answer: " << pack->payload << endl;
             pack->seqn++;
-            ret_value = sendto(monitorSockfd, pack, (1024 + sizeof(pack)), 0,
-                               (struct sockaddr *) &from, sizeof from_len);
+            ret_value = sendto(monitorSockfd, pack, (1024 + sizeof(*pack)), 0,
+                               (struct sockaddr *) &from, from_len);
             if (ret_value < 0) {
                 cout << "sendto error while sending election answer to " << inet_ntoa(from.sin_addr) << endl;
                 cout << "error code: " << strerror_r(errno, buffer, 256) << endl;
