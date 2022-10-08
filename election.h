@@ -23,6 +23,7 @@ class Election {
   static struct sockaddr_in listenerAddr, broadcastAddr;
 public:
   static int result;
+  static bool alreadyJoined;
 
   static void monitorElection();
 

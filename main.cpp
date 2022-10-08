@@ -112,8 +112,9 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
         manager_alive = isManagerAlive();
         if (!manager_alive) {
             cout << "Election!" << endl << endl;
+            cout << "starting election from keep alive" << endl;
             thread th1(Election::startElection);
-
+            Election::alreadyJoined = true;
             while (Election::result == 0) {
                 // cout << "aguardando resultado eleicao\n";
                 sleep(1);
@@ -997,7 +998,7 @@ void initialize() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
+    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -1015,7 +1016,7 @@ void initialize() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
+            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 g_my_ip_addr = inet_ntoa(teste->sin_addr);
             }
