@@ -3,6 +3,7 @@
 //
 
 #include "election.h"
+#include <errno.h>
 
 #define ELECTION_MESSAGE "election"
 #define ELECTION_ANSWER "lose"
@@ -15,12 +16,14 @@ int Election::monitorSockfd = 0;
 int Election::startSockfd = 0;
 struct sockaddr_in Election::monitorAddr;
 struct sockaddr_in Election::broadcastAddr;
+struct sockaddr_in Election::startAddr;
 int Election::result;
 bool Election::alreadyJoined = false;
 
 void Election::monitorElection() {
     int ret_value, len;
     struct sockaddr_in from{};
+    char buffer[256];
     socklen_t from_len = sizeof(struct sockaddr_in);
     Packet *pack = (Packet *) malloc(sizeof(Packet));
 
@@ -38,8 +41,14 @@ void Election::monitorElection() {
             strcpy(pack->payload, ELECTION_ANSWER);
             cout << "vou enviar answer: " << pack->payload << endl;
             pack->seqn++;
-            ret_value = sendto(monitorSockfd, pack, (1024 + sizeof(*pack)), MSG_CONFIRM,
+            ret_value = sendto(monitorSockfd, pack, (1024 + sizeof(pack)), 0,
                                (struct sockaddr *) &from, sizeof from_len);
+            if (ret_value < 0) {
+                cout << "sendto error while sending election answer to " << inet_ntoa(from.sin_addr) << endl;
+                cout << "error code: " << strerror_r(errno, buffer, 256) << endl;
+                exit(0);
+            }
+
             if (!alreadyJoined) {
                 result = 0;
                 cout << "starting election from election monitoring" << endl;
@@ -60,7 +69,7 @@ void Election::monitorElection() {
                     setsockopt(monitorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
                     ret_value = recvfrom(monitorSockfd, pack, sizeof(*pack), MSG_WAITALL,
                                          (struct sockaddr *) &from, &from_len);
-                    cout << "recebi a coordinator do novo manager!"
+                    cout << "recebi a coordinator do novo manager!" << endl;
 
                 }
             }
@@ -114,14 +123,21 @@ void Election::startElection() {
         }
         cout << "election message sent to address: " << inet_ntoa(to.sin_addr) << endl;
     }
-    while (i < listIP.size() + 5) {
+    while (i < listIP.size()) {
         sleep(1);
+        cout << "waiting for election answer (" << i << ") inside startElection" << endl;
+        struct timeval timeout{};
+        timeout.tv_sec = 5;
+        setsockopt(startSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
         ret_value = recvfrom(startSockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &from, &to_len);
-        if (ret_value < 0) {
-            cout << "recvfrom error in startElection line 110" << endl;
-            exit(0);
-        }
+//        if (ret_value < 0) {
+//            cout << "recvfrom error in startElection line 110" << endl;
+//            exit(0);
+//        }
+
+        timeout.tv_sec = 0;
+        setsockopt(startSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
         if (strcmp(pack->payload, ELECTION_ANSWER) == 0) {
             cout << "election answer received from id: " << inet_ntoa(from.sin_addr) << endl;
             cout << "Sai do startelection e NAO serei manager" << endl;
@@ -129,7 +145,6 @@ void Election::startElection() {
             return;
         }
         i++;
-
     }
     cout << "Sai do startelection e serei manager" << endl;
     sleep(1);
@@ -139,7 +154,7 @@ void Election::startElection() {
 
 void Election::sendCoordinator() {
 
-    int ret_value, len, myPid,;
+    int ret_value, len, myPid;
     struct sockaddr_in to{}, from{};
     socklen_t to_len = sizeof(struct sockaddr_in);
     Packet *pack = (Packet *) malloc(sizeof(Packet));

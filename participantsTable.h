@@ -33,7 +33,7 @@ public:
   ParticipantsTable() = default;
 
   void addParticipant(Participant p);
-S
+
   void addManager(Participant m);
 
   void deleteParticipant(const string &IPaddress);
