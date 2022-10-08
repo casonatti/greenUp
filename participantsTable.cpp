@@ -1,6 +1,6 @@
 #include "participantsTable.h"
 
-ParticipantsTable::ParticipantsTable(string message){
+ParticipantsTable::ParticipantsTable(string message) {
     std::string s;
     std::string columnDelimiter = ",";
     string lineDelimiter = ";";
@@ -48,7 +48,17 @@ void ParticipantsTable::addParticipant(Participant p) {
     p.status = "awake";
     tableMutex.lock();
     p.pid = id++;
+    p.isManager = false;
     table.insert({p.IP, p});
+    tableMutex.unlock();
+}
+
+void ParticipantsTable::addManager(Participant m) {
+    m.status = "awake";
+    tableMutex.lock();
+    m.pid = id++;
+    m.isManager = true;
+    table.insert({m.IP, m});
     tableMutex.unlock();
 }
 
@@ -62,13 +72,14 @@ void ParticipantsTable::printTable() {
     tableMutex.lock();
     cout << std::left;
     cout << "--------------------------------------------------------------------------\n";
-    cout << "|Hostname \t|MAC Address      |IP Address     |Status|PID|\n";
+    cout << "|Hostname \t|MAC Address      |IP Address     |Status|PID |isManager |\n";
     for (auto &ent: table) {
         cout << "|" << setw(15) << ent.second.hostname;
         cout << "|" << ent.second.MAC;
         cout << "|" << setw(15) << ent.second.IP;
         cout << "|" << setw(6) << ent.second.status;
-        cout << "|" << setw(3) << ent.second.pid << "|\n";
+        cout << "|" << setw(4) << ent.second.pid;
+        cout << "|" << setw(10) << ent.second.isManager << "|\n";
     }
     cout << "--------------------------------------------------------------------------\n";
     tableMutex.unlock();
@@ -122,7 +133,7 @@ string ParticipantsTable::getParticipantMac(const string &hostname) {
     return "";
 }
 
-int ParticipantsTable::getParticipantPid(const string &ip){
+int ParticipantsTable::getParticipantPid(const string &ip) {
     int pid;
     tableMutex.lock();
     for (auto &ent: table) {
@@ -154,11 +165,13 @@ bool ParticipantsTable::participantExists(const string &IPaddress) {
     return false;
 }
 
-string ParticipantsTable::parseTostring(){
+string ParticipantsTable::parseTostring() {
     string message = "";
     tableMutex.lock();
     for (auto &ent: table) {
-        message = message + ent.second.hostname + "," + ent.second.MAC + "," + ent.second.IP + "," + ent.second.status + "," + to_string(ent.second.pid) + ";";
+        message =
+                message + ent.second.hostname + "," + ent.second.MAC + "," + ent.second.IP + "," + ent.second.status +
+                "," + to_string(ent.second.pid) + "," + to_string(ent.second.isManager) + ";";
     }
     tableMutex.unlock();
     message = message + to_string(id);
@@ -194,13 +207,16 @@ void ParticipantsTable::updateTable(string s) {
                 case 3:
                     p.status = fieldToken;
                     break;
+                case 4:
+                    p.pid = stoi(lineToken);
+                    break;
                 default:
                     break;
             }
             lineToken.erase(0, column + columnDelimiter.length());
             i++;
         }
-        p.pid = stoi(lineToken);
+        p.isManager = stoi(lineToken);
         table.insert({p.IP, p});
         s.erase(0, line + lineDelimiter.length());
         i = 0;

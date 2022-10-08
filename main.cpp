@@ -24,6 +24,7 @@ using namespace std;
 // ---------------------------------------------------------------------------------------------------------------------
 
 bool isManagerAlive();
+
 static void manager_function();
 
 void signalHandler(int signum) {
@@ -95,7 +96,7 @@ static void *thr_participant_interface_service(__attribute__((unused)) void *arg
         }
     }
     cout << "Vou sair da participant_interface" << endl;
-    char* ret; 
+    char *ret;
     ret = strdup("exit");
     pthread_exit(ret);
 }
@@ -108,9 +109,7 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
     while (!g_has_manager);
 
     while (true) {
-        cout << "testando manager alive\n";
         manager_alive = isManagerAlive();
-        cout << "sai do is manager alive\n";
         if (!manager_alive) {
             cout << "Election!" << endl << endl;
             thread th1(Election::startElection);
@@ -131,7 +130,7 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
                 pthread_cancel(thr_monitoring);
                 pthread_cancel(thr_interface);
                 pthread_cancel(thr_table_update);
-                char* ret; 
+                char *ret;
                 ret = strdup("exit");
                 pthread_exit(ret);
             } else {
@@ -377,7 +376,6 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
             exit(0);
         }
 
-        
         if (!strcmp(pack->payload, NEWCOMMER)) {
             // send the manager info to the newcommer participant
             string s_payload = g_my_hostname + ", " + g_my_mac_addr + ", " + to_string(g_my_pid) + ", " + g_my_ip_addr;
@@ -385,7 +383,7 @@ static void *thr_manager_newcommer_service(__attribute__((unused)) void *arg) {
             strcpy(pack->payload, s_payload.data());
 
             ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                                (struct sockaddr *) &newcommer_addr, sizeof newcommer_addr);
+                               (struct sockaddr *) &newcommer_addr, sizeof newcommer_addr);
             if (ret_value < 0) {
                 cout << "Sendto error.";
                 exit(0);
@@ -459,7 +457,7 @@ static void *thr_participant_table_update_service(__attribute__((unused)) void *
         pTable.updateTable(pack->payload);
     }
     cout << "Vou sair da update table" << endl;
-    char* ret; 
+    char *ret;
     ret = strdup("exit");
     pthread_exit(ret);
 }
@@ -540,7 +538,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
         }
     }
     cout << "Vou sair da discovery" << endl;
-    char* ret; 
+    char *ret;
     ret = strdup("exit");
     pthread_exit(ret);
 }
@@ -771,7 +769,7 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
         }
     }
     cout << "Vou sair da monitoring" << endl;
-    char* ret; 
+    char *ret;
     ret = strdup("exit");
     pthread_exit(ret);
 }
@@ -837,33 +835,35 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
         list<string> listIP = pTable.getAllParticipantsIP();
         list<string>::iterator it;
         for (it = listIP.begin(); it != listIP.end(); ++it) {
-            pack->type = TYPE_MONITORING;
-            pack->seqn = seqn++;
-            strcpy(pack->payload, SLEEP_STATUS_REQUEST);
-            pack->length = strlen(pack->payload);
+            if (strcmp(it->c_str(), g_my_ip_addr.c_str()) != 0) {
+                pack->type = TYPE_MONITORING;
+                pack->seqn = seqn++;
+                strcpy(pack->payload, SLEEP_STATUS_REQUEST);
+                pack->length = strlen(pack->payload);
 
-            inet_aton(it->c_str(), (in_addr *) &p_address.sin_addr.s_addr);
-            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                               (struct sockaddr *) &p_address, sizeof p_address);
-            if (ret_value < 0) {
-                cout << "Sendto error." << endl;
-                exit(0);
-            }
-
-            ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
-                                 (struct sockaddr *) &p_address, &p_address_len);
-
-            if (ret_value < 0) {
-                //Participant doesn't sent response => It's asleep
-                if (strcmp(pTable.getParticipantStatus(*it), "awake") == 0) {
-                    pTable.sleepParticipant(*it);
-                    g_table_updated = true;
+                inet_aton(it->c_str(), (in_addr *) &p_address.sin_addr.s_addr);
+                ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                                   (struct sockaddr *) &p_address, sizeof p_address);
+                if (ret_value < 0) {
+                    cout << "Sendto error." << endl;
+                    exit(0);
                 }
-            } else {
-                //Participant sent response => It's awake
-                if (strcmp(pTable.getParticipantStatus(*it), "asleep") == 0) {
-                    pTable.wakeParticipant(*it);
-                    g_table_updated = true;
+
+                ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
+                                     (struct sockaddr *) &p_address, &p_address_len);
+
+                if (ret_value < 0) {
+                    //Participant doesn't sent response => It's asleep
+                    if (strcmp(pTable.getParticipantStatus(*it), "awake") == 0) {
+                        pTable.sleepParticipant(*it);
+                        g_table_updated = true;
+                    }
+                } else {
+                    //Participant sent response => It's awake
+                    if (strcmp(pTable.getParticipantStatus(*it), "asleep") == 0) {
+                        pTable.wakeParticipant(*it);
+                        g_table_updated = true;
+                    }
                 }
             }
         }
@@ -920,7 +920,7 @@ static void participant_function() {
     pthread_join(thr_keep_alive, nullptr);
     pthread_join(thr_table_update, nullptr);
 
-    if(is_manager){
+    if (is_manager) {
         cout << "Entrei no if do is_manager" << endl;
         manager_function();
     }
@@ -997,7 +997,7 @@ void initialize() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/eth0/address", "r");
+    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -1015,7 +1015,7 @@ void initialize() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "eth0") == 0) {
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 g_my_ip_addr = inet_ntoa(teste->sin_addr);
             }
@@ -1141,7 +1141,7 @@ bool newcommer() {
 
         cout << "newcommer participant getting table from manager" << endl;
         ret_value = recvfrom(sockfd, pack2, sizeof(*pack2), 0,
-                            (struct sockaddr *) &m_address, &m_address_len);
+                             (struct sockaddr *) &m_address, &m_address_len);
         if (ret_value < 0) {
             cout << "recvfrom error" << endl;
             exit(0);
@@ -1171,6 +1171,12 @@ int main(int argc, char **argv) {
     } else {
         cout << "Initializing Manager..." << endl << endl;
         sleep(1);
+        Participant me{
+                .hostname = g_my_hostname,
+                .MAC = g_my_mac_addr,
+                .IP = g_my_ip_addr
+        };
+        pTable.addManager(me);
         manager_function();
     }
 

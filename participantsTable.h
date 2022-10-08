@@ -21,6 +21,7 @@ typedef struct _participant {
   string IP;        // Participant IP address
   string status;    // Participant status
   int pid;        // Participant PID
+  bool isManager;
 } Participant;
 
 class ParticipantsTable {
@@ -32,6 +33,8 @@ public:
   ParticipantsTable() = default;
 
   void addParticipant(Participant p);
+
+  void addManager(Participant m);
 
   void deleteParticipant(const string &IPaddress);
 
