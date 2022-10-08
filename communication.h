@@ -21,6 +21,7 @@ public:
   static int createSocket();
   static struct sockaddr_in bindSocket(int sockfd, int port);
   static struct sockaddr_in createBroadcastAddress(int port);
+  static struct sockaddr_in createSendToAddress(int port);
 
 };
 

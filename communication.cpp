@@ -39,3 +39,14 @@ struct sockaddr_in Communication::createBroadcastAddress(int port) {
 
     return addr;
 }
+
+struct sockaddr_in Communication::createSendToAddress(int port) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+
+    addr.sin_family = AF_INET; // IPv4
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port);
+
+    return addr;
+}

@@ -19,8 +19,8 @@ using namespace std;
 
 class Election {
   ssize_t ret_value;
-  static int sockfd;
-  static struct sockaddr_in listenerAddr, broadcastAddr;
+  static int monitorSockfd, startSockfd;
+  static struct sockaddr_in monitorAddr, startAddr,broadcastAddr;
 public:
   static int result;
   static bool alreadyJoined;
