@@ -114,45 +114,49 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
     while (true) {
         manager_alive = isManagerAlive();
         if (!manager_alive) {
-            cout << "Election!" << endl << endl;
-            cout << "starting election from keep alive" << endl;
-            thread th1(Election::startElection);
-            Election::alreadyJoined = true;
-            while (Election::result == 0) {
-                // cout << "aguardando resultado eleicao\n";
-                sleep(1);
-            }
-            th1.join();
-            cout << "result changed!" << Election::result << endl;
-            if (Election::result == 1) {
-                cout << "vou ser o novo manager!";
-                Election::sendCoordinator();
-                cout << "Tenho que parar de ser participant e virar manager\n";
-                is_manager = true;
-                cout << "Vou sair da keep_alive" << endl;
-                pthread_cancel(thr_discovery);
-                pthread_cancel(thr_monitoring);
-                pthread_cancel(thr_interface);
-                pthread_cancel(thr_table_update);
-                char *ret;
-                ret = strdup("exit");
-                pthread_exit(ret);
-            } else {
-                cout << "vou esperar o novo manager se pronunciar";
-                struct timeval timeout{};
-                timeout.tv_sec = 5;
-                setsockopt(Election::monitorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
-                ret_value = recvfrom(Election::monitorSockfd, pack, sizeof(*pack), MSG_WAITALL,
-                                     (struct sockaddr *) &from, &from_len);
-                cout << "recebi a coordinator do novo manager!" << endl;
-                Participant m = parsePayload(pack->payload);
-                g_manager_hostname = m.hostname;
-                g_manager_MAC = m.MAC;
-                g_manager_ip = m.IP;
-                g_serv_addr = from;
-                cout << "sei quem e meu novo manager: " << g_manager_ip << "encerra eleicao" << endl;
-                Election::alreadyJoined = false;
+            cout << "Election! Vou checar para ver se ja estou em outra" << endl << endl;
+            if(!Election::alreadyJoined) {
+                cout << "starting election from keep alive" << endl;
+                thread th1(Election::startElection);
+                Election::alreadyJoined = true;
+                while (Election::result == 0) {
+                    // cout << "aguardando resultado eleicao\n";
+                    sleep(1);
+                }
+                th1.join();
+                cout << "result changed!" << Election::result << endl;
+                if (Election::result == 1) {
+                    cout << "vou ser o novo manager!";
+                    Election::sendCoordinator();
+                    cout << "Tenho que parar de ser participant e virar manager\n";
+                    is_manager = true;
+                    cout << "Vou sair da keep_alive" << endl;
+                    pthread_cancel(thr_discovery);
+                    pthread_cancel(thr_monitoring);
+                    pthread_cancel(thr_interface);
+                    pthread_cancel(thr_table_update);
+                    char *ret;
+                    ret = strdup("exit");
+                    pthread_exit(ret);
+                } else {
+                    cout << "vou esperar o novo manager se pronunciar";
+                    struct timeval timeout{};
+                    timeout.tv_sec = 5;
+                    setsockopt(Election::monitorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+                    ret_value = recvfrom(Election::monitorSockfd, pack, sizeof(*pack), MSG_WAITALL,
+                                         (struct sockaddr *) &from, &from_len);
+                    cout << "recebi a coordinator do novo manager!" << endl;
+                    Participant m = parsePayload(pack->payload);
+                    g_manager_hostname = m.hostname;
+                    g_manager_MAC = m.MAC;
+                    g_manager_ip = m.IP;
+                    g_serv_addr = from;
+                    cout << "sei quem e meu novo manager: " << g_manager_ip << "encerra eleicao" << endl;
+                    Election::alreadyJoined = false;
 
+                }
+            } else  {
+                cout << "Ja estou numa eleicao, nao vou iniciar outra!\n";
             }
 
         }
