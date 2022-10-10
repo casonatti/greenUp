@@ -140,7 +140,6 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
 
         }
         sleep(4);
-        cout << "ainda estouno while\n";
     }
 }
 
@@ -756,18 +755,28 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
             cout << "Recvfrom error.";
             exit(0);
         }
+        const char *my_manager_ip = g_manager_ip.c_str();
+        cout << "inet_ntoa recebido: " << inet_ntoa(manager_addr.sin_addr) << "my manager :" << my_manager_ip << endl;
 
-        string s_payload = "estou acordado";
-        strcpy(pack->payload, s_payload.data());
-        pack->type = TYPE_MONITORING;
-        pack->length = strlen(pack->payload);
+        if(strcmp(inet_ntoa(manager_addr.sin_addr), my_manager_ip) == 0){
+            string s_payload = "estou acordado";
+            strcpy(pack->payload, s_payload.data());
+            pack->type = TYPE_MONITORING;
+            pack->length = strlen(pack->payload);
 
-        ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
-                           (struct sockaddr *) &manager_addr, sizeof manager_addr);
-        if (ret_value < 0) {
-            cout << "Sendto error.";
-            exit(0);
+            ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
+                               (struct sockaddr *) &manager_addr, sizeof manager_addr);
+            if (ret_value < 0) {
+                cout << "Sendto error.";
+                exit(0);
+            }
+        } else{
+            manager_addr.sin_family = AF_INET;
+            manager_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
+            manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
         }
+
+
     }
     cout << "Vou sair da monitoring" << endl;
     char *ret;
@@ -936,6 +945,13 @@ static void manager_function() {
     pthread_attr_t attr_discovery, attr_monitoring, attr_interface, attr_newcommer, attr_keep_alive;
     is_manager = true;
 
+    Participant me{
+            .hostname = g_my_hostname,
+            .MAC = g_my_mac_addr,
+            .IP = g_my_ip_addr
+    };
+    pTable.addManager(me);
+
     ret_value = pthread_attr_init(&attr_discovery);
     if (ret_value != 0) {
         cout << "Pthread_attr_init error." << endl;
@@ -998,7 +1014,7 @@ void initialize() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
+    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -1016,7 +1032,7 @@ void initialize() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
+            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 g_my_ip_addr = inet_ntoa(teste->sin_addr);
             }
@@ -1172,12 +1188,6 @@ int main(int argc, char **argv) {
     } else {
         cout << "Initializing Manager..." << endl << endl;
         sleep(1);
-        Participant me{
-                .hostname = g_my_hostname,
-                .MAC = g_my_mac_addr,
-                .IP = g_my_ip_addr
-        };
-        pTable.addManager(me);
         manager_function();
     }
 

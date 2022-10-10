@@ -58,6 +58,8 @@ void ParticipantsTable::addManager(Participant m) {
     tableMutex.lock();
     m.pid = id++;
     m.isManager = true;
+    if(table.count(m.IP))
+        table.erase(m.IP);
     table.insert({m.IP, m});
     tableMutex.unlock();
 }
