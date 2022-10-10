@@ -149,6 +149,7 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
                 g_manager_hostname = m.hostname;
                 g_manager_MAC = m.MAC;
                 g_manager_ip = m.IP;
+                g_serv_addr = from;
                 cout << "sei quem e meu novo manager: " << g_manager_ip << "encerra eleicao" << endl;
                 Election::alreadyJoined = false;
 
