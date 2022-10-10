@@ -557,6 +557,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             cout << "Sendto error.";
             exit(0);
         }
+        cout << "enviei resposta do discovery ao manager\n";
     }
     cout << "Vou sair da discovery" << endl;
     char *ret;
@@ -624,6 +625,7 @@ static void *thr_manager_discovery_broadcaster(__attribute__((unused)) void *arg
             cout << "Sendto error." << endl;
             exit(0);
         }
+        cout << "enviei broadcast de discovery\n";
         sleep(8);
     }
 }
@@ -684,14 +686,16 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
             cout << "Recvfrom error.";
             exit(0);
         }
-
+        cout << "recebi resosta do discovery: " << pack->payload << "pack type: " << pack->type <<endl;
         if (!strcmp(pack->payload, SLEEP_SERVICE_EXIT)) {
             pTable.deleteParticipant(inet_ntoa(participant_addr.sin_addr));
             g_table_updated = true;
         } else if (pack->type == TYPE_DISCOVERY) {
             Participant p = parsePayload(pack->payload);
             if (!pTable.participantExists(p.IP)) {
+                cout << "vou adicionar um participante\n";
                 pTable.addParticipant(p);
+                cout << "adicionei um participante\n";
                 g_table_updated = true;
             }
         }

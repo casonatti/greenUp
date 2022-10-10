@@ -1,6 +1,7 @@
 #include <netinet/in.h>
 #include <cstdlib> // exit() precisa desse include nos labs do inf
 #include "participantsTable.h"
+#include <atomic>
 
 // -------------------------------------------------- CONSTANTS --------------------------------------------------------
 #define I_AM_MANAGER 0
@@ -21,7 +22,7 @@
 int g_sockfd, g_seqn = 1;
 bool is_manager = false;
 bool g_has_manager = false;
-bool g_table_updated = false;
+std::atomic<bool> g_table_updated = false;
 struct sockaddr_in g_serv_addr{};
 string g_my_hostname, g_my_mac_addr, g_my_ip_addr, g_manager_hostname, g_manager_MAC, g_manager_ip;
 ParticipantsTable pTable;
