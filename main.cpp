@@ -105,6 +105,9 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
     int sock_fd;
     bool manager_alive = false;
     ssize_t ret_value;
+    Packet *pack = (Packet *) malloc(sizeof(Packet));
+    struct sockaddr_in from{};
+    socklen_t from_len = sizeof(from);
 
     while (!g_has_manager);
 
@@ -136,6 +139,19 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
                 pthread_exit(ret);
             } else {
                 cout << "vou esperar o novo manager se pronunciar";
+                struct timeval timeout{};
+                timeout.tv_sec = 5;
+                setsockopt(Election::monitorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+                ret_value = recvfrom(Election::monitorSockfd, pack, sizeof(*pack), MSG_WAITALL,
+                                     (struct sockaddr *) &from, &from_len);
+                cout << "recebi a coordinator do novo manager!" << endl;
+                Participant m = parsePayload(pack->payload);
+                g_manager_hostname = m.hostname;
+                g_manager_MAC = m.MAC;
+                g_manager_ip = m.IP;
+                cout << "sei quem e meu novo manager: " << g_manager_ip << "encerra eleicao" << endl;
+                Election::alreadyJoined = false;
+
             }
 
         }

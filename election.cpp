@@ -12,6 +12,8 @@
 #define PORT_ELECTION_SERVICE_MONITOR 10001
 #define PORT_ELECTION_SERVICE_START 10002
 
+extern Participant parsePayload(string payLoad);
+
 int Election::monitorSockfd = 0;
 int Election::startSockfd = 0;
 struct sockaddr_in Election::monitorAddr;
@@ -70,7 +72,12 @@ void Election::monitorElection() {
                     ret_value = recvfrom(monitorSockfd, pack, sizeof(*pack), MSG_WAITALL,
                                          (struct sockaddr *) &from, &from_len);
                     cout << "recebi a coordinator do novo manager!" << endl;
-
+                    Participant m = parsePayload(pack->payload);
+                    g_manager_hostname = m.hostname;
+                    g_manager_MAC = m.MAC;
+                    g_manager_ip = m.IP;
+                    cout << "sei quem e meu novo manager: " << g_manager_ip << "encerra eleicao" << endl;
+                    alreadyJoined = false;
                 }
             }
         }
