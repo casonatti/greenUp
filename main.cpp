@@ -557,7 +557,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             cout << "Sendto error.";
             exit(0);
         }
-        cout << "enviei resposta do discovery ao manager\n";
+        cout << "enviei resposta do discovery ao manager: " << inet_ntoa(manager_addr.sin_addr) << endl;
     }
     cout << "Vou sair da discovery" << endl;
     char *ret;
@@ -634,7 +634,7 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
     int sockfd, true_flag = true;
     ssize_t ret_value;
     socklen_t participant_len = sizeof(struct sockaddr_in);
-    struct sockaddr_in manager_addr{}, broadcast_addr{}, participant_addr{};
+    struct sockaddr_in manager_addr{}, participant_addr{};
     auto *pack = (Packet *) malloc(sizeof(Packet));
 
     // creates manager's discovery socket
@@ -664,11 +664,6 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
     manager_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_LISTENER);
     manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    // configure manager's discovery broadcast address
-    broadcast_addr.sin_family = AF_INET;
-    broadcast_addr.sin_port = (in_port_t) htons(PORT_DISCOVERY_SERVICE_BROADCAST);
-    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-
     // bind the manager's discovery socket to the listening port
     ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, sizeof(manager_addr));
     if (ret_value < 0) {
@@ -679,7 +674,9 @@ static void *thr_manager_discovery_listener(__attribute__((unused)) void *arg) {
     // ------------------------------------------- DISCOVERY LISTENER --------------------------------------------------
 
     // loop responsible for receiving answers to broadcasted discovery packets
+    sleep(5);
     while (true) {
+        cout << "esperando por pacote de resposta do discovery" << endl;
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &participant_addr, &participant_len);
         if (ret_value < 0) {
@@ -765,13 +762,6 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
     manager_addr.sin_family = AF_INET;
     manager_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
     manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    // bind the participant's monitoring socket to the listening port
-    ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, manager_len);
-    if (ret_value < 0) {
-        cout << "Bind socket error." << endl;
-        exit(0);
-    }
 
     while (!is_manager) {
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
@@ -1039,7 +1029,7 @@ void initialize() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/wlo1/address", "r");
+    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -1057,7 +1047,7 @@ void initialize() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "wlo1") == 0) {
+            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 g_my_ip_addr = inet_ntoa(teste->sin_addr);
             }
