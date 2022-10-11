@@ -33,7 +33,13 @@ void signalHandler(int signum) {
     strcpy(g_pack->payload, SLEEP_SERVICE_EXIT);
     g_pack->length = strlen(g_pack->payload);
 
-    sendto(g_sockfd, g_pack, (1024 + sizeof(*g_pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
+    if (is_manager) {
+        pTable.deleteParticipant(g_my_ip_addr);
+        g_table_updated = true;
+        sleep(1);
+    } else {
+        sendto(g_sockfd, g_pack, (1024 + sizeof(*g_pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
+    }
 
     exit(signum);
 }
@@ -1029,7 +1035,7 @@ void initialize() {
 
     cout << "Getting my MAC address..." << endl;
     pthread_mutex_unlock(&mtx);
-    FILE *file = fopen("/sys/class/net/enp0s3/address", "r");
+    FILE *file = fopen("/sys/class/net/eth0/address", "r");
     i = 0;
     char c_my_mac_addr[16];
     while (fscanf(file, "%c", &c_my_mac_addr[i]) == 1) {
@@ -1047,7 +1053,7 @@ void initialize() {
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             // TODO: colocar o nome da interface de rede
-            if (strcmp(ifa->ifa_name, "enp0s3") == 0) {
+            if (strcmp(ifa->ifa_name, "eth0") == 0) {
                 teste = (struct sockaddr_in *) ifa->ifa_addr;
                 g_my_ip_addr = inet_ntoa(teste->sin_addr);
             }
