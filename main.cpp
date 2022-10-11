@@ -557,7 +557,7 @@ static void *thr_participant_discovery_service(__attribute__((unused)) void *arg
             cout << "Sendto error.";
             exit(0);
         }
-        cout << "enviei resposta do discovery ao manager\n";
+        cout << "enviei resposta do discovery ao manager: " << inet_ntoa(g_serv_addr.sin_addr) << endl;
     }
     cout << "Vou sair da discovery" << endl;
     char *ret;
