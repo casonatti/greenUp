@@ -33,8 +33,14 @@ void signalHandler(int signum) {
     strcpy(g_pack->payload, SLEEP_SERVICE_EXIT);
     g_pack->length = strlen(g_pack->payload);
 
-    sendto(g_sockfd, g_pack, (1024 + sizeof(*g_pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
-
+    if (is_manager) {
+        pTable.deleteParticipant(g_my_ip_addr);
+        g_table_updated = true;
+        sleep(1);
+    } else {
+        sendto(g_sockfd, g_pack, (1024 + sizeof(*g_pack)), 0, (struct sockaddr *) &g_serv_addr, sizeof g_serv_addr);
+    }
+    
     exit(signum);
 }
 
@@ -126,7 +132,7 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
                 th1.join();
                 cout << "result changed!" << Election::result << endl;
                 if (Election::result == 1) {
-                    cout << "vou ser o novo manager!";
+                    cout << "(main) vou ser o novo manager!";
                     Election::sendCoordinator();
                     cout << "Tenho que parar de ser participant e virar manager\n";
                     is_manager = true;
@@ -139,13 +145,23 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
                     ret = strdup("exit");
                     pthread_exit(ret);
                 } else {
-                    cout << "vou esperar o novo manager se pronunciar";
-                    struct timeval timeout{};
-                    timeout.tv_sec = 5;
-                    setsockopt(Election::monitorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
-                    ret_value = recvfrom(Election::monitorSockfd, pack, sizeof(*pack), MSG_WAITALL,
+                    cout << "vou esperar o novo manager se pronunciar" << endl;
+                    // struct timeval timeout{};
+                    // timeout.tv_sec = 5;
+                    // setsockopt(Election::coordinatorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+                    ret_value = recvfrom(Election::coordinatorSockfd, pack, sizeof(*pack), 0,
                                          (struct sockaddr *) &from, &from_len);
-                    cout << "recebi a coordinator do novo manager!" << endl;
+                    if (ret_value < 0) {
+                        cout << "error on recvfrom in (main) receive coordinator: " << strerror(errno) << endl;
+                        exit(0);
+                    }
+                    // timeout.tv_sec = 0;
+                    // setsockopt(Election::coordinatorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+
+                    cout << "(main) recebi a coordinator do novo manager!" << endl;
+                    cout << "payload: " << pack->payload << endl;
+                    cout << "address from sender: " << inet_ntoa(from.sin_addr) << endl;
+
                     Participant m = parsePayload(pack->payload);
                     g_manager_hostname = m.hostname;
                     g_manager_MAC = m.MAC;
@@ -153,12 +169,12 @@ static void *thr_participant_keep_alive_monitoring(__attribute__((unused)) void 
                     g_serv_addr = from;
                     cout << "sei quem e meu novo manager: " << g_manager_ip << "encerra eleicao" << endl;
                     Election::alreadyJoined = false;
-
+                    g_has_manager = true;
+                    sleep(5);
                 }
             } else  {
                 cout << "Ja estou numa eleicao, nao vou iniciar outra!\n";
             }
-
         }
         sleep(4);
     }
@@ -763,6 +779,13 @@ static void *thr_participant_monitoring_service(__attribute__((unused)) void *ar
     manager_addr.sin_port = (in_port_t) htons(PORT_MONITORING_SERVICE_BROADCAST);
     manager_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
+    // bind the participant's monitoring socket to the listening port
+    ret_value = bind(sockfd, (struct sockaddr *) &manager_addr, manager_len);
+    if (ret_value < 0) {
+        cout << "Bind socket error." << endl;
+        exit(0);
+    }
+
     while (!is_manager) {
         ret_value = recvfrom(sockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &manager_addr, &manager_len);
@@ -869,6 +892,7 @@ static void *thr_manager_monitoring_service(__attribute__((unused)) void *arg) {
                 inet_aton(it->c_str(), (in_addr *) &p_address.sin_addr.s_addr);
                 ret_value = sendto(sockfd, pack, (1024 + sizeof(*pack)), 0,
                                    (struct sockaddr *) &p_address, sizeof p_address);
+                cout << "monitoring message sent to port: " << p_address.sin_port << endl;
                 if (ret_value < 0) {
                     cout << "Sendto error." << endl;
                     exit(0);

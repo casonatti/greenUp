@@ -11,14 +11,17 @@
 #define PORT_ELECTION_SERVICE_BROADCAST 10000
 #define PORT_ELECTION_SERVICE_MONITOR 10001
 #define PORT_ELECTION_SERVICE_START 10002
+#define PORT_ELECTION_SERVICE_COORDINATOR 10003
 
 extern Participant parsePayload(string payLoad);
 
 int Election::monitorSockfd = 0;
 int Election::startSockfd = 0;
+int Election::coordinatorSockfd = 0;
 struct sockaddr_in Election::monitorAddr;
 struct sockaddr_in Election::broadcastAddr;
 struct sockaddr_in Election::startAddr;
+struct sockaddr_in Election::coordinatorAddr;
 int Election::result;
 bool Election::alreadyJoined = false;
 
@@ -58,20 +61,31 @@ void Election::monitorElection() {
                 alreadyJoined = true;
                 while (result == 0) {
                 }
+                // th1.join();
                 cout << "result changed!" << result << endl;
                 if (result == 1) {
-                    cout << "vou ser o novo manager!";
+                    cout << "(election) vou ser o novo manager!";
                     sendCoordinator();
 //                    alreadyJoined = false;
                 } else {
                     cout << "NAO VOU SER MANAGER, vou esperar o novo manager se pronunciar";
-
+                    // TODO: caso em que ocorre um timeout
                     struct timeval timeout{};
                     timeout.tv_sec = 5;
-                    setsockopt(monitorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
-                    ret_value = recvfrom(monitorSockfd, pack, sizeof(*pack), MSG_WAITALL,
+                    setsockopt(coordinatorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+                    ret_value = recvfrom(coordinatorSockfd, pack, sizeof(*pack), MSG_WAITALL,
                                          (struct sockaddr *) &from, &from_len);
-                    cout << "recebi a coordinator do novo manager!" << endl;
+                    if (ret_value < 0) {
+                        cout << "recvfrom coordinator message error" << endl;
+                        cout << "error code: " << strerror_r(errno, buffer, 256) << endl;
+                        exit(0);
+                    }
+                    timeout.tv_sec = 0;
+                    setsockopt(coordinatorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+
+                    cout << "(election) recebi a coordinator do novo manager!" << endl;
+                    cout << "payload: " << pack->payload << endl;
+
                     Participant m = parsePayload(pack->payload);
                     g_manager_hostname = m.hostname;
                     g_manager_MAC = m.MAC;
@@ -79,6 +93,7 @@ void Election::monitorElection() {
                     g_serv_addr = from;
                     cout << "sei quem e meu novo manager: " << g_manager_ip << "encerra eleicao" << endl;
                     alreadyJoined = false;
+                    g_has_manager = true;
                 }
             }
         }
@@ -92,6 +107,9 @@ void Election::monitorElection() {
 void Election::startElectionThread() {
     monitorSockfd = Communication::createSocket();
     monitorAddr = Communication::bindSocket(monitorSockfd, PORT_ELECTION_SERVICE_MONITOR);
+
+    coordinatorSockfd = Communication::createSocket();
+    coordinatorAddr = Communication::bindSocket(coordinatorSockfd, PORT_ELECTION_SERVICE_COORDINATOR);
 
     startSockfd = Communication::createSocket();
     startAddr = Communication::bindSocket(startSockfd, PORT_ELECTION_SERVICE_START);
@@ -134,18 +152,19 @@ void Election::startElection() {
     while (i < listIP.size()) {
         sleep(1);
         cout << "waiting for election answer (" << i << ") inside startElection" << endl;
+
         struct timeval timeout{};
         timeout.tv_sec = 5;
         setsockopt(startSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
         ret_value = recvfrom(startSockfd, pack, sizeof(*pack), 0,
                              (struct sockaddr *) &from, &to_len);
-//        if (ret_value < 0) {
-//            cout << "recvfrom error in startElection line 110" << endl;
-//            exit(0);
-//        }
-
+        if (ret_value < 0) {
+            cout << "recvfrom error in startElection line 110" << endl;
+            exit(0);
+        }
         timeout.tv_sec = 0;
-        setsockopt(startSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+        setsockopt(monitorSockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+
         if (strcmp(pack->payload, ELECTION_ANSWER) == 0) {
             cout << "election answer received from id: " << inet_ntoa(from.sin_addr) << endl;
             cout << "Sai do startelection e NAO serei manager" << endl;
@@ -171,10 +190,10 @@ void Election::sendCoordinator() {
     strcpy(pack->payload, load.c_str());
     pack->type = TYPE_ELECTION;
     pack->seqn = 0;
-    cout << "sending coordinator\n";
-    ret_value = sendto(monitorSockfd, pack, (1024 + sizeof(*pack)), 0,
-                       (struct sockaddr *) &broadcastAddr, sizeof broadcastAddr);
-    cout << "coordinator message sent :" << pack->payload << endl;
+    cout << "sending coordinator with payload: " << pack->payload << endl;
+    ret_value = sendto(coordinatorSockfd, pack, (1024 + sizeof(*pack)), 0,
+                       (struct sockaddr *) &coordinatorAddr, sizeof coordinatorAddr);
+    cout << "coordinator message sent to port: " << coordinatorAddr.sin_port << endl;
 }
 
 bool Election::isManagerAlive() {

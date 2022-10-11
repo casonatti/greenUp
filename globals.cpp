@@ -15,7 +15,6 @@
 #define PORT_MONITORING_SERVICE_BROADCAST 9000
 #define PORT_MONITORING_SERVICE_LISTENER 9001
 
-
 // -------------------------------------------------- VARIABLES --------------------------------------------------------
 
 // prefixadas com g_ por serem globais e para nao sofrerem shadowing das locais
